@@ -2,7 +2,7 @@ package websocket
 
 import (
 	"fmt"
-	"net"
+//	"net"
 	"runtime"
 	"strconv"
 
@@ -12,39 +12,44 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/dunglas/frankenphp"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 )
 
 func init() {
-	caddy.RegisterModule(Grpc{})
-	httpcaddyfile.RegisterGlobalOption("grpc", parseGlobalOption)
+	caddy.RegisterModule(Websocket{})
+	httpcaddyfile.RegisterGlobalOption("websocket", parseGlobalOption)
 }
 
-var grpcServerFactory func() *grpc.Server
+// var websocketServerFactory func() *websocket.Server
 
-func RegisterWebsocketServerFactory(f func() *grpc.Server) {
-	grpcServerFactory = f
+/*
+func RegisterWebsocketServerFactory(f func() *websocket.Server) {
+	websocketServerFactory = f
+}
+*/
+
+func RegisterWebsocketServerFactory() {
+	// websocketServerFactory = f
 }
 
-type Grpc struct {
+type Websocket struct {
 	Address    string `json:"address,omitempty"`
 	MinThreads int    `json:"min_threads,omitempty"`
 	Worker     string `json:"worker,omitempty"`
 
 	ctx    caddy.Context
 	logger *zap.Logger
-	srv    *grpc.Server
+//	srv    *websocket.Server
 }
 
 // CaddyModule returns the Caddy module information.
-func (Grpc) CaddyModule() caddy.ModuleInfo {
+func (Websocket) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
-		ID:  "grpc",
-		New: func() caddy.Module { return new(Grpc) },
+		ID:  "websocket",
+		New: func() caddy.Module { return new(Websocket) },
 	}
 }
 
-func (g *Grpc) Provision(ctx caddy.Context) error {
+func (g *Websocket) Provision(ctx caddy.Context) error {
 	g.logger = ctx.Logger()
 	g.ctx = ctx
 
@@ -68,45 +73,59 @@ func (g *Grpc) Provision(ctx caddy.Context) error {
 	return nil
 }
 
-func (g Grpc) Start() error {
+func (g Websocket) Start() error {
+
+	/*
 	address, err := caddy.ParseNetworkAddress(g.Address)
 	if err != nil {
 		return err
 	}
+*/
 
-	lnAny, err := address.Listen(g.ctx, 0, net.ListenConfig{})
+//	lnAny, err := address.Listen(g.ctx, 0, net.ListenConfig{})
+
+/*
 	if err != nil {
 		return err
 	}
+*/
 
-	ln := lnAny.(net.Listener)
+//	ln := lnAny.(net.Listener)
 
-	if grpcServerFactory == nil {
+/*
+	if websocketServerFactory == nil {
 		return fmt.Errorf("no gRPC server factory registered")
 	}
+*/
 
-	g.srv = grpcServerFactory()
+/*
+	g.srv = websocketServerFactory()
 	go func() {
 		if err := g.srv.Serve(ln); err != nil {
-			g.logger.Panic("failed to start gRPC server", zap.Error(err))
+			g.logger.Panic("failed to start websocket server", zap.Error(err))
 		}
 	}()
+*/
+
 
 	g.logger.Info("websocket server started", zap.String("address", g.Address))
 
 	return nil
 }
 
-func (g Grpc) Stop() error {
+func (g Websocket) Stop() error {
+
+	/*
 	if g.srv != nil {
 		g.srv.GracefulStop()
 		g.srv = nil
 	}
+    */
 
 	return nil
 }
 
-func (g *Grpc) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
+func (g *Websocket) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
 		for d.NextBlock(0) {
 			// when adding a new directive, also update the allowedDirectives error message
@@ -143,20 +162,20 @@ func (g *Grpc) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 }
 
 func parseGlobalOption(d *caddyfile.Dispenser, _ any) (any, error) {
-	app := &Grpc{}
+	app := &Websocket{}
 	if err := app.UnmarshalCaddyfile(d); err != nil {
 		return nil, err
 	}
 
 	// tell Caddyfile adapter that this is the JSON for an app
 	return httpcaddyfile.App{
-		Name:  "grpc",
+		Name:  "websocket",
 		Value: caddyconfig.JSON(app, nil),
 	}, nil
 }
 
 // Interface guards
 var (
-	_ caddy.Module = (*Grpc)(nil)
-	_ caddy.App    = (*Grpc)(nil)
+	_ caddy.Module = (*Websocket)(nil)
+	_ caddy.App    = (*Websocket)(nil)
 )

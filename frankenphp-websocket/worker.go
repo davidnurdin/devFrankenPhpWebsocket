@@ -18,7 +18,7 @@ type worker struct {
 }
 
 func (*worker) Name() string {
-	return "m#Grpc"
+	return "m#Websocket"
 }
 
 func (w *worker) FileName() string {
