@@ -36,10 +36,13 @@ func (w *worker) Env() frankenphp.PreparedEnv {
 	return frankenphp.PreparedEnv{}
 }
 
-var u = &url.URL{Host: "websocket.alt", Path: "/websocket"}
+var u = &url.URL{Host: "websocket.alt", Path: "/ws"}
 
 func (w *worker) ProvideRequest() *frankenphp.WorkerRequest[any, any] {
+
+    println("R1")
 	m := <-w.messages
+    println("R2")
 
 	return &frankenphp.WorkerRequest[any, any]{
 		Request:            &http.Request{URL: u},

@@ -1,8 +1,8 @@
 {
 	frankenphp
 	websocket {
-		address :50051 # Optional
+		address :5000 # Optional
 		worker websocket-worker.php # Optional
-		min_threads 50 # Optional, defaults to runtime.NumCPU()
+		min_threads 5 # Optional, defaults to runtime.NumCPU()
 	}
 }

@@ -4,10 +4,9 @@
 //require __DIR__ . '/vendor/autoload.php';
 
 // Handler outside the loop for better performance (doing less work)
-$handler = static function (array $request): array  {
+$handler = static function (string $msg): array  {
 	// Do something with the gRPC request
-
-    return ['message' => "Hello, {$request['Name']}"];
+    return ['message' => "Hello from PHP : " . $msg];
 };
 
 $maxRequests = (int)($_SERVER['MAX_REQUESTS'] ?? 0);

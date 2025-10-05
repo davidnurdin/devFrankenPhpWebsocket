@@ -2,7 +2,7 @@ package websocket
 
 import (
 	"fmt"
-//	"net"
+	"net"
 	"runtime"
 	"strconv"
 
@@ -12,6 +12,7 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/dunglas/frankenphp"
 	"go.uber.org/zap"
+	"github.com/lxzan/gws"
 )
 
 func init() {
@@ -19,17 +20,39 @@ func init() {
 	httpcaddyfile.RegisterGlobalOption("websocket", parseGlobalOption)
 }
 
-// var websocketServerFactory func() *websocket.Server
+type MyHandler struct {
+    gws.BuiltinEventHandler
+}
 
-/*
-func RegisterWebsocketServerFactory(f func() *websocket.Server) {
+func (h *MyHandler) OnMessage(socket *gws.Conn, message *gws.Message) {
+    println("Message reçu :", string(message.Bytes()))
+    socket.WriteString("Message reçu !")
+
+     // Envoi le message au worker PHP via HandleRequest
+    response := HandleRequest(string(message.Bytes()))
+
+    // Renvoie la réponse au client WebSocket
+    socket.WriteString(fmt.Sprintf("%v", response))
+
+
+}
+
+func (h *MyHandler) OnConnect(socket *gws.Conn) {
+    println("Nouvelle connexion")
+}
+
+func (h *MyHandler) OnClose(socket *gws.Conn, err error) {
+    println("Connexion fermée")
+}
+
+var HandlerInstance = &MyHandler{}
+
+var websocketServerFactory func() *gws.Server
+
+func RegisterWebsocketServerFactory(f func() *gws.Server) {
 	websocketServerFactory = f
 }
-*/
 
-func RegisterWebsocketServerFactory() {
-	// websocketServerFactory = f
-}
 
 type Websocket struct {
 	Address    string `json:"address,omitempty"`
@@ -38,7 +61,7 @@ type Websocket struct {
 
 	ctx    caddy.Context
 	logger *zap.Logger
-//	srv    *websocket.Server
+	srv    *gws.Server
 }
 
 // CaddyModule returns the Caddy module information.
@@ -54,7 +77,7 @@ func (g *Websocket) Provision(ctx caddy.Context) error {
 	g.ctx = ctx
 
 	if g.Address == "" {
-		g.Address = ":50051"
+		g.Address = ":5000"
 	}
 
 	if g.MinThreads <= 0 {
@@ -75,38 +98,29 @@ func (g *Websocket) Provision(ctx caddy.Context) error {
 
 func (g Websocket) Start() error {
 
-	/*
 	address, err := caddy.ParseNetworkAddress(g.Address)
 	if err != nil {
 		return err
 	}
-*/
 
-//	lnAny, err := address.Listen(g.ctx, 0, net.ListenConfig{})
+	lnAny, err := address.Listen(g.ctx, 0, net.ListenConfig{})
 
-/*
 	if err != nil {
 		return err
 	}
-*/
 
-//	ln := lnAny.(net.Listener)
+	ln := lnAny.(net.Listener)
 
-/*
 	if websocketServerFactory == nil {
-		return fmt.Errorf("no gRPC server factory registered")
+		return fmt.Errorf("no websocket server factory registered")
 	}
-*/
 
-/*
 	g.srv = websocketServerFactory()
 	go func() {
-		if err := g.srv.Serve(ln); err != nil {
+		if err := g.srv.RunListener(ln); err != nil {
 			g.logger.Panic("failed to start websocket server", zap.Error(err))
 		}
 	}()
-*/
-
 
 	g.logger.Info("websocket server started", zap.String("address", g.Address))
 
@@ -115,12 +129,10 @@ func (g Websocket) Start() error {
 
 func (g Websocket) Stop() error {
 
-	/*
 	if g.srv != nil {
-		g.srv.GracefulStop()
+		// g.srv.Close() not implemented
 		g.srv = nil
 	}
-    */
 
 	return nil
 }

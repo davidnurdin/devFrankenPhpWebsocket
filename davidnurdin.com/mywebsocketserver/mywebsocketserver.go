@@ -1,21 +1,13 @@
 package mywebsocketserver
 
 import (
-//	"context"
-//	"fmt"
-
-//	"github.com/dunglas/frankenphp"
 	phpWebsocket "github.com/davidnurdin/frankenphp-websocket"
+	"github.com/lxzan/gws"
 )
 
 func init() {
-	phpWebsocket.RegisterWebsocketServerFactory()
-	/* func() *websocket.Server {
-		s := grpc.NewServer()
-		pb.RegisterGreeterServer(s, &server{})
-		reflection.Register(s)
-
-		return s
-	}) */
-
+    phpWebsocket.RegisterWebsocketServerFactory(func() *gws.Server {
+        s := gws.NewServer(phpWebsocket.HandlerInstance, nil)
+        return s
+    })
 }
