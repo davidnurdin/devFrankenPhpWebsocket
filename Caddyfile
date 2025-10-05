@@ -1,0 +1,8 @@
+{
+	frankenphp
+	grpc {
+		address :50051 # Optional
+		worker websocket-worker.php # Optional
+		min_threads 50 # Optional, defaults to runtime.NumCPU()
+	}
+}
