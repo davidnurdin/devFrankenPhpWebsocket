@@ -9,4 +9,4 @@ xcaddy build \
   --with github.com/dunglas/frankenphp=./frankenphp \
   --with github.com/dunglas/frankenphp/caddy=./frankenphp/caddy \
   --with github.com/davidnurdin/frankenphp-websocket=./frankenphp-websocket \
-  --with davidnurdin.com/mygrpcserver=./davidnurdin.com/mygrpcserver
+  --with davidnurdin.com/mywebsocketserver=./davidnurdin.com/mywebsocketserver

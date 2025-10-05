@@ -1,7 +1,0 @@
-{
-	debug
-	frankenphp
-	grpc {
-		address :50051
-	}
-}

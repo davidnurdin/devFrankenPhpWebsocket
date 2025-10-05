@@ -22,7 +22,7 @@ func init() {
 
 var grpcServerFactory func() *grpc.Server
 
-func RegisterGrpcServerFactory(f func() *grpc.Server) {
+func RegisterWebsocketServerFactory(f func() *grpc.Server) {
 	grpcServerFactory = f
 }
 
@@ -92,7 +92,7 @@ func (g Grpc) Start() error {
 		}
 	}()
 
-	g.logger.Info("gRPC server started", zap.String("address", g.Address))
+	g.logger.Info("websocket server started", zap.String("address", g.Address))
 
 	return nil
 }
