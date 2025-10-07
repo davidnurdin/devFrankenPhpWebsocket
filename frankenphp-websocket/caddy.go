@@ -28,10 +28,22 @@ type MyHandler struct {
 }
 
 func (h *MyHandler) OnMessage(socket *gws.Conn, message *gws.Message) {
-	println("Message reçu :", string(message.Bytes()))
+	// Prevent any panic from bubbling up and crashing the server
+	defer func() { _ = recover() }()
+	// Always release the message buffer back to gws to avoid crashes/leaks
+	defer message.Close()
+
+	// Copy payload before closing; handle empty payload safely
+	data := message.Bytes()
+	if len(data) == 0 {
+		// Ignore empty messages entirely
+		return
+	}
+
+	println("Message reçu :", string(data))
 
 	id := getConnID(socket)
-	w.events <- Event{Type: EventMessage, Connection: id, RemoteAddr: socket.RemoteAddr().String(), Payload: string(message.Bytes())}
+	w.events <- Event{Type: EventMessage, Connection: id, RemoteAddr: socket.RemoteAddr().String(), Payload: string(data)}
 
 	// socket.WriteString("Message reçu !")
 
