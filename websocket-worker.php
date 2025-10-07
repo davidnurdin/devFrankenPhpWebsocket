@@ -9,6 +9,19 @@ $handler = static function (array $event): array  {
     // $event['Connection']  => identifiant de connexion (string)
     // $event['Payload']     => données associées
 
+    //go_print();
+   // frankenphp_ws_getClients();
+   var_dump(frankenphp_ws_getClients());
+
+   foreach (frankenphp_ws_getClients() as $client)
+   {
+        frankenphp_ws_send($client,"HELLO " . rand(1,1000));
+   }
+
+
+   file_put_contents('php://stderr','Result of frankenphp_ws_getClients : ' . var_export(frankenphp_ws_getClients(),true));
+
+
     file_put_contents('php://stderr', "Handler called with " . var_export($event, true) . "\n");
 
     if (($event['Type'] ?? null) === 'message') {

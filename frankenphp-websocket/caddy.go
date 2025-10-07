@@ -222,6 +222,16 @@ func parseGlobalOption(d *caddyfile.Dispenser, _ any) (any, error) {
 	}, nil
 }
 
+// Retourne tous les IDs de connexion WebSocket
+func WSListClients() []string {
+	var ids []string
+	connIDs.Range(func(_, v any) bool {
+		ids = append(ids, v.(string))
+		return true
+	})
+	return ids
+}
+
 // Interface guards
 var (
 	_ caddy.Module = (*Websocket)(nil)

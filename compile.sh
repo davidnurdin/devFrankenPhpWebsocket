@@ -1,8 +1,10 @@
 #!/bin/bash
 
+./generate_stub.sh
+
 CGO_ENABLED=1 \
 XCADDY_GO_BUILD_FLAGS="-ldflags='-w -s' -tags=nobadger,nomysql,nopgx" \
-CGO_CFLAGS=$(php-config --includes) \
+CGO_CFLAGS="$(php-config --includes) -D_GNU_SOURCE" \
 CGO_LDFLAGS="$(php-config --ldflags) $(php-config --libs)" \
 xcaddy build \
   --output websocket \

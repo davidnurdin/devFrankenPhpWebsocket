@@ -6,3 +6,15 @@
 		min_threads 5 # Optional, defaults to runtime.NumCPU()
 	}
 }
+
+:80 {
+	root * .
+	php_server
+	file_server
+
+	@ws_send path /ws/send
+	handle @ws_send {
+		rewrite * /websocket-send.php
+		php_server
+	}
+}
