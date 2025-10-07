@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -8,11 +9,11 @@ import (
 )
 
 var w = &worker{
-	messages: make(chan message),
+	events: make(chan Event, 1024),
 }
 
 type worker struct {
-	messages  chan message
+	events    chan Event
 	minThread int
 	filename  string
 }
@@ -40,15 +41,25 @@ var u = &url.URL{Host: "websocket.alt", Path: "/ws"}
 
 func (w *worker) ProvideRequest() *frankenphp.WorkerRequest[any, any] {
 
-    println("R1")
-	m := <-w.messages
-    println("R2")
+	println("R1")
+	ev := <-w.events
+	println("R2")
+
+	// log ev to Stderr
+	fmt.Println("ev", ev)
 
 	return &frankenphp.WorkerRequest[any, any]{
-		Request:            &http.Request{URL: u},
-		CallbackParameters: m.request,
+		Request: &http.Request{URL: u},
+		CallbackParameters: map[string]any{
+			"Type":       string(ev.Type),
+			"Connection": ev.Connection,
+			"RemoteAddr": ev.RemoteAddr,
+			"Payload":    ev.Payload,
+		},
 		AfterFunc: func(callbackReturn any) {
-			m.responseChan <- callbackReturn
+			if ev.ResponseCh != nil {
+				ev.ResponseCh <- callbackReturn
+			}
 		},
 	}
 }

@@ -1,18 +1,21 @@
 package websocket
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"runtime"
 	"strconv"
+	"sync"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/dunglas/frankenphp"
-	"go.uber.org/zap"
 	"github.com/lxzan/gws"
+	"go.uber.org/zap"
 )
 
 func init() {
@@ -21,28 +24,62 @@ func init() {
 }
 
 type MyHandler struct {
-    gws.BuiltinEventHandler
+	gws.BuiltinEventHandler
 }
 
 func (h *MyHandler) OnMessage(socket *gws.Conn, message *gws.Message) {
-    println("Message reçu :", string(message.Bytes()))
-    socket.WriteString("Message reçu !")
+	println("Message reçu :", string(message.Bytes()))
 
-     // Envoi le message au worker PHP via HandleRequest
-    response := HandleRequest(string(message.Bytes()))
+	id := getConnID(socket)
+	w.events <- Event{Type: EventMessage, Connection: id, RemoteAddr: socket.RemoteAddr().String(), Payload: string(message.Bytes())}
 
-    // Renvoie la réponse au client WebSocket
-    socket.WriteString(fmt.Sprintf("%v", response))
+	// socket.WriteString("Message reçu !")
 
+	// Envoi le message au worker PHP via HandleRequest
+	//response := HandleRequest(string(message.Bytes()))
+
+	// Renvoie la réponse au client WebSocket
+	// socket.WriteString(fmt.Sprintf("%v", response))
 
 }
 
-func (h *MyHandler) OnConnect(socket *gws.Conn) {
-    println("Nouvelle connexion")
+func (h *MyHandler) OnOpen(socket *gws.Conn) {
+	id := newConnID()
+	connIDs.Store(socket, id)
+	println("Nouvelle connexion " + id)
+	// Publie un événement d'ouverture (pas de réponse attendue)
+	w.events <- Event{Type: EventOpen, Connection: id, RemoteAddr: socket.RemoteAddr().String()}
 }
 
 func (h *MyHandler) OnClose(socket *gws.Conn, err error) {
-    println("Connexion fermée")
+	println("Connexion fermée")
+	// Publie un événement de fermeture (pas de réponse attendue)
+	if id, ok := connIDs.Load(socket); ok {
+		w.events <- Event{Type: EventClose, Connection: id.(string), RemoteAddr: socket.RemoteAddr().String(), Payload: err}
+		connIDs.Delete(socket)
+		return
+	}
+	w.events <- Event{Type: EventClose, Connection: "", RemoteAddr: socket.RemoteAddr().String(), Payload: err}
+}
+
+var connIDs sync.Map // *gws.Conn -> string
+
+func newConnID() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		// fallback deterministic-ish (shouldn't happen)
+		return "fallback-id"
+	}
+	return hex.EncodeToString(b)
+}
+
+func getConnID(c *gws.Conn) string {
+	if v, ok := connIDs.Load(c); ok {
+		return v.(string)
+	}
+	id := newConnID()
+	connIDs.Store(c, id)
+	return id
 }
 
 var HandlerInstance = &MyHandler{}
@@ -52,7 +89,6 @@ var websocketServerFactory func() *gws.Server
 func RegisterWebsocketServerFactory(f func() *gws.Server) {
 	websocketServerFactory = f
 }
-
 
 type Websocket struct {
 	Address    string `json:"address,omitempty"`

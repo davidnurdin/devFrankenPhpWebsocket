@@ -4,16 +4,25 @@
 //require __DIR__ . '/vendor/autoload.php';
 
 // Handler outside the loop for better performance (doing less work)
-$handler = static function (string $msg): array  {
-	// Do something with the gRPC request
-    return ['message' => "Hello from PHP : " . $msg];
+$handler = static function (array $event): array  {
+    // $event['Type']        => 'open' | 'message' | 'close'
+    // $event['Connection']  => identifiant de connexion (string)
+    // $event['Payload']     => données associées
+
+    file_put_contents('php://stderr', "Handler called with " . var_export($event, true) . "\n");
+
+    if (($event['Type'] ?? null) === 'message') {
+        return ['message' => 'Hello from PHP : ' . (string)($event['Payload'] ?? '')];
+    }
+
+    // Pour open/close, aucune réponse particulière n'est requise
+    return ['ok' => true];
 };
 
 file_put_contents('php://stderr', "WebSocket worker started with PID " . getmypid() . "\n");
 
 
-$maxRequests = (int)($_SERVER['MAX_REQUESTS'] ?? 0);
-$maxRequests = 2 ;
+$maxRequests = (int)($_SERVER['MAX_REQUESTS'] ?? 0); // illimité si 0
 
 for ($nbRequests = 0; !$maxRequests || $nbRequests < $maxRequests; ++$nbRequests) {
     file_put_contents('php://stderr', "Handled request #" . ($nbRequests + 1) . "\n");
