@@ -1,7 +1,7 @@
 {
 	frankenphp
 	# Ensure our custom handler directive is ordered relative to others
-	order websocket before file_server
+	# order websocket before file_server
 	websocket {
 		address 127.0.0.1:5001 # Optional
 		worker websocket-worker.php # Optional

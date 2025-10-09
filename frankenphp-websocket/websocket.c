@@ -22,7 +22,7 @@ PHP_FUNCTION(frankenphp_ws_getClients)
     array_init(return_value);
     frankenphp_ws_current_retval = return_value;
     // Go will iterate clients and call back frankenphp_ws_addClient for each
-    frankenphp_ws_listClients();
+    frankenphp_ws_getClients();
     frankenphp_ws_current_retval = NULL;
 }
 

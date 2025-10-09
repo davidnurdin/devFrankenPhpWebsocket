@@ -1,14 +1,19 @@
 package websocket
 
+//#include "websocket.h"
+import "C"
 import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"runtime"
 	"strconv"
 	"sync"
+	"unsafe"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig"
@@ -19,7 +24,6 @@ import (
 	"go.uber.org/zap"
 
 	"context"
-	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
@@ -36,20 +40,22 @@ func init() {
 
 	caddy.RegisterModule(MyAdmin{})
 
+	httpcaddyfile.RegisterDirectiveOrder("websocket", "before", "file_server")
+
 }
 
 type MyAdmin struct {
 }
 
 // TODO : add auth ! (bearer ?)
-// curl http://localhost:2019/frankenphp_ws/listClients
+// curl http://localhost:2019/frankenphp_ws/getClients
 // curl http://localhost:2019/frankenphp_ws/send
 
 // Implémente AdminRouter: retourne les routes exposées par ce module
 func (MyAdmin) Routes() []caddy.AdminRoute {
 	return []caddy.AdminRoute{
 		{
-			Pattern: "/frankenphp_ws/listClients",
+			Pattern: "/frankenphp_ws/getClients",
 			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
 				if r.Method != http.MethodGet {
 					return caddy.APIError{
@@ -64,7 +70,7 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 			}),
 		},
 		{
-			Pattern: "/frankenphp_ws/send",
+			Pattern: "/frankenphp_ws/send/{clientID}",
 			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
 				if r.Method != http.MethodPost {
 					return caddy.APIError{
@@ -72,7 +78,29 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 						Err:        fmt.Errorf("method not allowed"),
 					}
 				}
-				//TODO !!!
+
+				// Récupérer le clientID depuis l'URL
+				clientID := r.PathValue("clientID")
+				if clientID == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("clientID is required"),
+					}
+				}
+
+				// Lire le body de la requête
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("failed to read request body: %v", err),
+					}
+				}
+
+				// Appeler la fonction interne frankenphp_ws_send
+				C.frankenphp_ws_send(C.CString(clientID), (*C.char)(unsafe.Pointer(&body[0])), C.int(len(body)))
+
+				w.WriteHeader(http.StatusOK)
 				return nil
 			}),
 		},
