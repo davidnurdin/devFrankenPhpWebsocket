@@ -9,7 +9,9 @@ $handler = static function (array $event): array  {
     // $event['Connection']  => identifiant de connexion (string)
     // $event['Payload']     => données associées
 
-   file_put_contents('php://stderr','Result of frankenphp_ws_getClients : ' . var_export(frankenphp_ws_getClients(),true));
+    // TODO voir => bug : frankenphp_ws_getClients crash le serveur en cas d'open/close simultané
+
+    file_put_contents('php://stderr','Result of frankenphp_ws_getClients : ' . var_export(frankenphp_ws_getClients(),true));
 
 
     file_put_contents('php://stderr', "Handler called with " . var_export($event, true) . "\n");
@@ -19,6 +21,7 @@ $handler = static function (array $event): array  {
         {
             frankenphp_ws_send($client,"MSG FROM ANOTHER WS => " . (string)($event['Payload']));
         }
+
         
         return ['message' => 'Hello from PHP : ' . (string)($event['Payload'] ?? '')];
     }
