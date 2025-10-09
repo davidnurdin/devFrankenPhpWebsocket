@@ -3,32 +3,21 @@
 	# Ensure our custom handler directive is ordered relative to others
 	order websocket before file_server
 	websocket {
-		address 127.0.0.1:5000 # Optional
+		address 127.0.0.1:5001 # Optional
 		worker websocket-worker.php # Optional
 		min_threads 5 # Optional, defaults to runtime.NumCPU()
 	}
 }
 
-# :80 {
-# 	root * .
-# 	php_server
-# 	file_server
-
-# 	@ws_send path /ws/send
-# 	handle @ws_send {
-# 		rewrite * /websocket-send.php
-# 		php_server
-# 	}
-# }
-
-
 localhost {
+	root * .
 	route {
 		handle_path /ws/* {
 			route {
 				websocket
 			}
 		}
-    file_server
+		php_server
+		file_server
 	}
 }
