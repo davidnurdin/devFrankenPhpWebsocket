@@ -3,6 +3,7 @@ package websocket
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net"
 	"runtime"
@@ -32,6 +33,50 @@ func init() {
 	caddy.RegisterModule(WSHandler{})
 	httpcaddyfile.RegisterGlobalOption("websocket", parseGlobalOption)
 	httpcaddyfile.RegisterHandlerDirective("websocket", parseWebsocketHandler)
+
+	caddy.RegisterModule(MyAdmin{})
+
+}
+
+type MyAdmin struct {
+}
+
+// TODO : add auth ! (bearer ?)
+// curl http://localhost:2019/frankenphp_ws/listClients
+// curl http://localhost:2019/frankenphp_ws/send
+
+// Implémente AdminRouter: retourne les routes exposées par ce module
+func (MyAdmin) Routes() []caddy.AdminRoute {
+	return []caddy.AdminRoute{
+		{
+			Pattern: "/frankenphp_ws/listClients",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"clients": WSListClients(),
+				})
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/send",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodPost {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+				//TODO !!!
+				return nil
+			}),
+		},
+	}
 }
 
 type MyHandler struct {
@@ -167,6 +212,14 @@ func (WSHandler) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
 		ID:  "http.handlers.websocket",
 		New: func() caddy.Module { return new(WSHandler) },
+	}
+}
+
+// CaddyModule: identifiant dans le namespace admin.api
+func (MyAdmin) CaddyModule() caddy.ModuleInfo {
+	return caddy.ModuleInfo{
+		ID:  "admin.api.myadmin",
+		New: func() caddy.Module { return new(MyAdmin) },
 	}
 }
 
