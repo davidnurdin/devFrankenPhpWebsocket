@@ -141,7 +141,9 @@ func (h *MyHandler) OnMessage(socket *gws.Conn, message *gws.Message) {
 
 func (h *MyHandler) OnOpen(socket *gws.Conn) {
 	id := newConnID()
+	connIDsMutex.Lock()
 	connIDs.Store(socket, id)
+	connIDsMutex.Unlock()
 	println("Nouvelle connexion " + id)
 	// Publie un événement d'ouverture (pas de réponse attendue)
 	w.events <- Event{Type: EventOpen, Connection: id, RemoteAddr: socket.RemoteAddr().String()}
@@ -150,15 +152,20 @@ func (h *MyHandler) OnOpen(socket *gws.Conn) {
 func (h *MyHandler) OnClose(socket *gws.Conn, err error) {
 	println("Connexion fermée")
 	// Publie un événement de fermeture (pas de réponse attendue)
+	connIDsMutex.Lock()
 	if id, ok := connIDs.Load(socket); ok {
-		w.events <- Event{Type: EventClose, Connection: id.(string), RemoteAddr: socket.RemoteAddr().String(), Payload: err}
 		connIDs.Delete(socket)
+		connIDsMutex.Unlock()
+		w.events <- Event{Type: EventClose, Connection: id.(string), RemoteAddr: socket.RemoteAddr().String(), Payload: err}
 		return
 	}
+	connIDsMutex.Unlock()
 	w.events <- Event{Type: EventClose, Connection: "", RemoteAddr: socket.RemoteAddr().String(), Payload: err}
 }
 
-var connIDs sync.Map // *gws.Conn -> string
+var connIDs sync.Map             // *gws.Conn -> string
+var connIDsMutex sync.RWMutex    // Protège les accès concurrents à connIDs
+var frankenphpWSMutex sync.Mutex // Protège les appels à frankenphp_ws_getClients()
 
 func newConnID() string {
 	b := make([]byte, 16)
@@ -170,11 +177,16 @@ func newConnID() string {
 }
 
 func getConnID(c *gws.Conn) string {
-	if v, ok := connIDs.Load(c); ok {
+	connIDsMutex.RLock()
+	v, ok := connIDs.Load(c)
+	connIDsMutex.RUnlock()
+	if ok {
 		return v.(string)
 	}
 	id := newConnID()
+	connIDsMutex.Lock()
 	connIDs.Store(c, id)
+	connIDsMutex.Unlock()
 	return id
 }
 
@@ -457,10 +469,12 @@ func parseWebsocketHandler(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler,
 // Retourne tous les IDs de connexion WebSocket
 func WSListClients() []string {
 	var ids []string
+	connIDsMutex.RLock()
 	connIDs.Range(func(_, v any) bool {
 		ids = append(ids, v.(string))
 		return true
 	})
+	connIDsMutex.RUnlock()
 	return ids
 }
 

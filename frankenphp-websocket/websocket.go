@@ -62,7 +62,10 @@ func HandleRequest(request any) any {
 }
 
 //export frankenphp_ws_getClients
-func frankenphp_ws_getClients() {
+func frankenphp_ws_getClients(array unsafe.Pointer) {
+	// Protéger contre les appels concurrents qui peuvent causer des crashes
+	frankenphpWSMutex.Lock()
+	defer frankenphpWSMutex.Unlock()
 
 	sapi := getCurrentSAPI()
 	// print it
@@ -113,7 +116,7 @@ func frankenphp_ws_getClients() {
 
 	for _, id := range ids {
 		cstr := C.CString(id)
-		C.frankenphp_ws_addClient(cstr)
+		C.frankenphp_ws_addClient((*C.zval)(array), cstr)
 		C.free(unsafe.Pointer(cstr))
 	}
 
@@ -159,6 +162,7 @@ func frankenphp_ws_send(connectionId *C.char, data *C.char, dataLen C.int) {
 	// Mode Caddy/server : utilisation directe
 	// find the *gws.Conn by id and send data
 	var target *gws.Conn
+	connIDsMutex.RLock()
 	connIDs.Range(func(k, v any) bool {
 		if v.(string) == id {
 			target = k.(*gws.Conn)
@@ -166,6 +170,7 @@ func frankenphp_ws_send(connectionId *C.char, data *C.char, dataLen C.int) {
 		}
 		return true
 	})
+	connIDsMutex.RUnlock()
 
 	if target == nil {
 		caddy.Log().Warn("WS send: connection not found", zap.String("id", id))

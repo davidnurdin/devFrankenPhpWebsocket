@@ -5,25 +5,20 @@
 // Contient les symboles exportés par Go
 #include "_cgo_export.h"
 
-// Holds the current return_value while building the array
-static zval* frankenphp_ws_current_retval = NULL;
-
-void frankenphp_ws_addClient(const char* id)
+void frankenphp_ws_addClient(zval* array, const char* id)
 {
-    if (frankenphp_ws_current_retval == NULL) {
+    if (array == NULL) {
         return;
     }
-    add_next_index_string(frankenphp_ws_current_retval, id);
+    add_next_index_string(array, id);
 }
 
 PHP_FUNCTION(frankenphp_ws_getClients)
 {
     ZEND_PARSE_PARAMETERS_NONE();
     array_init(return_value);
-    frankenphp_ws_current_retval = return_value;
     // Go will iterate clients and call back frankenphp_ws_addClient for each
-    frankenphp_ws_getClients();
-    frankenphp_ws_current_retval = NULL;
+    frankenphp_ws_getClients((void*)return_value);
 }
 
 PHP_FUNCTION(frankenphp_ws_send)
