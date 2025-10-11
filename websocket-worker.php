@@ -14,6 +14,9 @@ $handler = static function (array $event): array  {
     file_put_contents('php://stderr','Result of frankenphp_ws_getClients : ' . var_export(frankenphp_ws_getClients(),true));
 
 
+    $group = rand(1,5);
+    frankenphp_ws_tagClient($event['Connection'],'group_' . $group);
+    
     file_put_contents('php://stderr', "Handler called with " . var_export($event, true) . "\n");
 
     if (($event['Type'] ?? null) === 'message') {
