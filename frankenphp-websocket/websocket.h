@@ -14,4 +14,14 @@ void frankenphp_ws_getClients(void* array);
 // Send data to a specific client by connection ID (matches cgo export signature)
 void frankenphp_ws_send(char* connectionId, char* data, int data_len);
 
+// Tag management functions
+void frankenphp_ws_tagClient(char* connectionId, char* tag);
+void frankenphp_ws_untagClient(char* connectionId, char* tag);
+void frankenphp_ws_clearTagClient(char* connectionId);
+
+// Tag query and broadcast functions
+void frankenphp_ws_getTags(void* array);
+void frankenphp_ws_getClientsByTag(void* array, char* tag);
+void frankenphp_ws_sendToTag(char* tag, char* data, int data_len);
+
 #endif

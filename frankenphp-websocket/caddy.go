@@ -104,6 +104,217 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				return nil
 			}),
 		},
+		{
+			Pattern: "/frankenphp_ws/tag/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodPost {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer le clientID depuis l'URL
+				clientID := r.PathValue("clientID")
+				if clientID == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("clientID is required"),
+					}
+				}
+
+				// Lire le tag depuis le body de la requête
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("failed to read request body: %v", err),
+					}
+				}
+
+				tag := string(body)
+				if tag == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("tag is required"),
+					}
+				}
+
+				// Appeler la fonction interne pour tagger le client
+				WSTagClient(clientID, tag)
+
+				w.WriteHeader(http.StatusOK)
+				return nil
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/untag/{clientID}/{tag}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodDelete {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer le clientID et le tag depuis l'URL
+				clientID := r.PathValue("clientID")
+				tag := r.PathValue("tag")
+				if clientID == "" || tag == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("clientID and tag are required"),
+					}
+				}
+
+				// Appeler la fonction interne pour untagger le client
+				WSUntagClient(clientID, tag)
+
+				w.WriteHeader(http.StatusOK)
+				return nil
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/clearTags/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodDelete {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer le clientID depuis l'URL
+				clientID := r.PathValue("clientID")
+				if clientID == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("clientID is required"),
+					}
+				}
+
+				// Appeler la fonction interne pour supprimer tous les tags du client
+				WSClearTagsClient(clientID)
+
+				w.WriteHeader(http.StatusOK)
+				return nil
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/getTags/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer le clientID depuis l'URL
+				clientID := r.PathValue("clientID")
+				if clientID == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("clientID is required"),
+					}
+				}
+
+				// Récupérer les tags du client
+				tags := WSGetClientTags(clientID)
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"clientID": clientID,
+					"tags":     tags,
+				})
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/getClientsByTag/{tag}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer le tag depuis l'URL
+				tag := r.PathValue("tag")
+				if tag == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("tag is required"),
+					}
+				}
+
+				// Récupérer les clients ayant ce tag
+				clients := WSGetClientsByTag(tag)
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"tag":     tag,
+					"clients": clients,
+				})
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/getAllTags",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer tous les tags
+				tags := WSGetAllTags()
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"tags": tags,
+				})
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/sendToTag/{tag}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodPost {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer le tag depuis l'URL
+				tag := r.PathValue("tag")
+				if tag == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("tag is required"),
+					}
+				}
+
+				// Lire le body de la requête
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("failed to read request body: %v", err),
+					}
+				}
+
+				// Envoyer le message à tous les clients ayant ce tag
+				sentCount := WSSendToTag(tag, body)
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"tag":       tag,
+					"sentCount": sentCount,
+				})
+			}),
+		},
 	}
 }
 
@@ -154,9 +365,14 @@ func (h *MyHandler) OnClose(socket *gws.Conn, err error) {
 	// Publie un événement de fermeture (pas de réponse attendue)
 	connIDsMutex.Lock()
 	if id, ok := connIDs.Load(socket); ok {
+		connectionID := id.(string)
 		connIDs.Delete(socket)
 		connIDsMutex.Unlock()
-		w.events <- Event{Type: EventClose, Connection: id.(string), RemoteAddr: socket.RemoteAddr().String(), Payload: err}
+
+		// Nettoyer les tags de cette connexion
+		WSClearTagsClient(connectionID)
+
+		w.events <- Event{Type: EventClose, Connection: connectionID, RemoteAddr: socket.RemoteAddr().String(), Payload: err}
 		return
 	}
 	connIDsMutex.Unlock()
@@ -166,6 +382,10 @@ func (h *MyHandler) OnClose(socket *gws.Conn, err error) {
 var connIDs sync.Map             // *gws.Conn -> string
 var connIDsMutex sync.RWMutex    // Protège les accès concurrents à connIDs
 var frankenphpWSMutex sync.Mutex // Protège les appels à frankenphp_ws_getClients()
+
+// Système de tags pour les connexions WebSocket
+var connTags = make(map[string]map[string]bool) // connectionID -> map[tag]bool
+var connTagsMutex sync.RWMutex                  // Protège les accès concurrents à connTags
 
 func newConnID() string {
 	b := make([]byte, 16)
@@ -476,6 +696,119 @@ func WSListClients() []string {
 	})
 	connIDsMutex.RUnlock()
 	return ids
+}
+
+// TagClient ajoute un tag à une connexion
+func WSTagClient(connectionID, tag string) bool {
+	connTagsMutex.Lock()
+	defer connTagsMutex.Unlock()
+
+	if connTags[connectionID] == nil {
+		connTags[connectionID] = make(map[string]bool)
+	}
+	connTags[connectionID][tag] = true
+	return true
+}
+
+// UntagClient retire un tag spécifique d'une connexion
+func WSUntagClient(connectionID, tag string) bool {
+	connTagsMutex.Lock()
+	defer connTagsMutex.Unlock()
+
+	if connTags[connectionID] != nil {
+		delete(connTags[connectionID], tag)
+		// Si plus de tags, supprimer l'entrée
+		if len(connTags[connectionID]) == 0 {
+			delete(connTags, connectionID)
+		}
+	}
+	return true
+}
+
+// ClearTagsClient retire tous les tags d'une connexion
+func WSClearTagsClient(connectionID string) bool {
+	connTagsMutex.Lock()
+	defer connTagsMutex.Unlock()
+
+	delete(connTags, connectionID)
+	return true
+}
+
+// GetClientTags retourne tous les tags d'une connexion
+func WSGetClientTags(connectionID string) []string {
+	connTagsMutex.RLock()
+	defer connTagsMutex.RUnlock()
+
+	var tags []string
+	if connTags[connectionID] != nil {
+		for tag := range connTags[connectionID] {
+			tags = append(tags, tag)
+		}
+	}
+	return tags
+}
+
+// GetClientsByTag retourne tous les clients ayant un tag spécifique
+func WSGetClientsByTag(tag string) []string {
+	connTagsMutex.RLock()
+	defer connTagsMutex.RUnlock()
+
+	var clients []string
+	for connectionID, tags := range connTags {
+		if tags[tag] {
+			clients = append(clients, connectionID)
+		}
+	}
+	return clients
+}
+
+// GetAllTags retourne tous les tags existants
+func WSGetAllTags() []string {
+	connTagsMutex.RLock()
+	defer connTagsMutex.RUnlock()
+
+	tagSet := make(map[string]bool)
+	for _, tags := range connTags {
+		for tag := range tags {
+			tagSet[tag] = true
+		}
+	}
+
+	var allTags []string
+	for tag := range tagSet {
+		allTags = append(allTags, tag)
+	}
+	return allTags
+}
+
+// SendToTag envoie un message à tous les clients ayant un tag spécifique
+func WSSendToTag(tag string, data []byte) int {
+	clients := WSGetClientsByTag(tag)
+	sentCount := 0
+
+	for _, connectionID := range clients {
+		// Trouver la connexion WebSocket
+		var target *gws.Conn
+		connIDsMutex.RLock()
+		connIDs.Range(func(k, v any) bool {
+			if v.(string) == connectionID {
+				target = k.(*gws.Conn)
+				return false
+			}
+			return true
+		})
+		connIDsMutex.RUnlock()
+
+		if target != nil {
+			if err := target.WriteMessage(gws.OpcodeBinary, data); err != nil {
+				caddy.Log().Error("WS send to tag failed", zap.String("tag", tag), zap.String("connectionID", connectionID), zap.Error(err))
+			} else {
+				sentCount++
+			}
+		}
+	}
+
+	return sentCount
 }
 
 // Interface guards

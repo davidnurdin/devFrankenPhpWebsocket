@@ -185,3 +185,262 @@ func frankenphp_ws_send(connectionId *C.char, data *C.char, dataLen C.int) {
 
 	caddy.Log().Info("WS message sent successfully", zap.String("id", id))
 }
+
+//export frankenphp_ws_tagClient
+func frankenphp_ws_tagClient(connectionID *C.char, tag *C.char) {
+	id := C.GoString(connectionID)
+	tagStr := C.GoString(tag)
+
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to tag client", zap.String("id", id), zap.String("tag", tagStr))
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/tag/%s", id)
+		payload := []byte(tagStr)
+		adminRequest, err := http.NewRequest("POST", url, bytes.NewReader(payload))
+		if err != nil {
+			caddy.Log().Error("Error creating admin tag request", zap.Error(err))
+			return
+		}
+		adminRequest.Header.Set("Content-Type", "text/plain")
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin tag request", zap.Error(err))
+			return
+		}
+		defer adminResponse.Body.Close()
+
+		caddy.Log().Info("Admin tag response", zap.Int("status", adminResponse.StatusCode))
+		return
+	}
+
+	// Mode Caddy/server : utilisation directe
+	WSTagClient(id, tagStr)
+	caddy.Log().Info("WS client tagged successfully", zap.String("id", id), zap.String("tag", tagStr))
+}
+
+//export frankenphp_ws_untagClient
+func frankenphp_ws_untagClient(connectionID *C.char, tag *C.char) {
+	id := C.GoString(connectionID)
+	tagStr := C.GoString(tag)
+
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to untag client", zap.String("id", id), zap.String("tag", tagStr))
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/untag/%s/%s", id, tagStr)
+		adminRequest, err := http.NewRequest("DELETE", url, nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin untag request", zap.Error(err))
+			return
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin untag request", zap.Error(err))
+			return
+		}
+		defer adminResponse.Body.Close()
+
+		caddy.Log().Info("Admin untag response", zap.Int("status", adminResponse.StatusCode))
+		return
+	}
+
+	// Mode Caddy/server : utilisation directe
+	WSUntagClient(id, tagStr)
+	caddy.Log().Info("WS client untagged successfully", zap.String("id", id), zap.String("tag", tagStr))
+}
+
+//export frankenphp_ws_clearTagClient
+func frankenphp_ws_clearTagClient(connectionID *C.char) {
+	id := C.GoString(connectionID)
+
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to clear tags for client", zap.String("id", id))
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/clearTags/%s", id)
+		adminRequest, err := http.NewRequest("DELETE", url, nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin clear tags request", zap.Error(err))
+			return
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin clear tags request", zap.Error(err))
+			return
+		}
+		defer adminResponse.Body.Close()
+
+		caddy.Log().Info("Admin clear tags response", zap.Int("status", adminResponse.StatusCode))
+		return
+	}
+
+	// Mode Caddy/server : utilisation directe
+	WSClearTagsClient(id)
+	caddy.Log().Info("WS client tags cleared successfully", zap.String("id", id))
+}
+
+//export frankenphp_ws_getTags
+func frankenphp_ws_getTags(array unsafe.Pointer) {
+	// Protéger contre les appels concurrents
+	frankenphpWSMutex.Lock()
+	defer frankenphpWSMutex.Unlock()
+
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS getTags called", zap.String("sapi", sapi))
+
+	var tags []string
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to get all tags")
+
+		adminRequest, err := http.NewRequest("GET", "http://localhost:2019/frankenphp_ws/getAllTags", nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin get tags request", zap.Error(err))
+			return
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin get tags request", zap.Error(err))
+			return
+		}
+		defer adminResponse.Body.Close()
+
+		body, err := io.ReadAll(adminResponse.Body)
+		if err != nil {
+			caddy.Log().Error("Error reading admin response", zap.Error(err))
+			return
+		}
+
+		var response struct {
+			Tags []string `json:"tags"`
+		}
+		err = json.Unmarshal(body, &response)
+		if err != nil {
+			caddy.Log().Error("Error unmarshalling admin response", zap.Error(err))
+			return
+		}
+
+		tags = response.Tags
+	} else {
+		// Mode Caddy/server : utilisation directe
+		tags = WSGetAllTags()
+	}
+
+	// Ajouter les tags au tableau PHP
+	for _, tag := range tags {
+		cstr := C.CString(tag)
+		C.frankenphp_ws_addClient((*C.zval)(array), cstr)
+		C.free(unsafe.Pointer(cstr))
+	}
+
+	caddy.Log().Info("WS tags list", zap.Int("count", len(tags)), zap.Strings("tags", tags))
+}
+
+//export frankenphp_ws_getClientsByTag
+func frankenphp_ws_getClientsByTag(array unsafe.Pointer, tag *C.char) {
+	// Protéger contre les appels concurrents
+	frankenphpWSMutex.Lock()
+	defer frankenphpWSMutex.Unlock()
+
+	tagStr := C.GoString(tag)
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS getClientsByTag called", zap.String("sapi", sapi), zap.String("tag", tagStr))
+
+	var clients []string
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to get clients by tag")
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/getClientsByTag/%s", tagStr)
+		adminRequest, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin get clients by tag request", zap.Error(err))
+			return
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin get clients by tag request", zap.Error(err))
+			return
+		}
+		defer adminResponse.Body.Close()
+
+		body, err := io.ReadAll(adminResponse.Body)
+		if err != nil {
+			caddy.Log().Error("Error reading admin response", zap.Error(err))
+			return
+		}
+
+		var response struct {
+			Clients []string `json:"clients"`
+		}
+		err = json.Unmarshal(body, &response)
+		if err != nil {
+			caddy.Log().Error("Error unmarshalling admin response", zap.Error(err))
+			return
+		}
+
+		clients = response.Clients
+	} else {
+		// Mode Caddy/server : utilisation directe
+		clients = WSGetClientsByTag(tagStr)
+	}
+
+	// Ajouter les clients au tableau PHP
+	for _, client := range clients {
+		cstr := C.CString(client)
+		C.frankenphp_ws_addClient((*C.zval)(array), cstr)
+		C.free(unsafe.Pointer(cstr))
+	}
+
+	caddy.Log().Info("WS clients by tag", zap.String("tag", tagStr), zap.Int("count", len(clients)), zap.Strings("clients", clients))
+}
+
+//export frankenphp_ws_sendToTag
+func frankenphp_ws_sendToTag(tag *C.char, data *C.char, dataLen C.int) {
+	tagStr := C.GoString(tag)
+	payload := C.GoBytes(unsafe.Pointer(data), dataLen)
+
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS sendToTag called", zap.String("sapi", sapi), zap.String("tag", tagStr), zap.Int("dataLen", int(dataLen)))
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to send to tag")
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/sendToTag/%s", tagStr)
+		adminRequest, err := http.NewRequest("POST", url, bytes.NewReader(payload))
+		if err != nil {
+			caddy.Log().Error("Error creating admin send to tag request", zap.Error(err))
+			return
+		}
+		adminRequest.Header.Set("Content-Type", "application/octet-stream")
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin send to tag request", zap.Error(err))
+			return
+		}
+		defer adminResponse.Body.Close()
+
+		caddy.Log().Info("Admin send to tag response", zap.Int("status", adminResponse.StatusCode))
+		return
+	}
+
+	// Mode Caddy/server : utilisation directe
+	sentCount := WSSendToTag(tagStr, payload)
+	caddy.Log().Info("WS message sent to tag successfully", zap.String("tag", tagStr), zap.Int("sentCount", sentCount))
+}
