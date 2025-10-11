@@ -37,6 +37,16 @@ if (!empty($clients)) {
     }
     echo "\n";
     
+
+    // 3A. Afficher tags
+    echo "3A. Afficher tags : \n";
+    $tagsAfter = frankenphp_ws_getTags();
+    foreach ($tagsAfter as $tag) {
+        echo "   - $tag\n";
+    }
+    echo "\n";
+
+
     // 4. Envoyer un message à tous les clients premium (nouvelle méthode)
     echo "4. Envoyer un message à tous les clients 'premium' (méthode directe) :\n";
     frankenphp_ws_sendToTag('premium', "Message spécial pour les clients premium!");
