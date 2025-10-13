@@ -17,6 +17,13 @@ $handler = static function (array $event): array  {
     $group = rand(1,5);
     frankenphp_ws_tagClient($event['Connection'],'group_' . $group);
     
+    // Test de la fonction de renommage
+    if (($event['Type'] ?? null) === 'open') {
+        $newId = 'renamed_' . $event['Connection'];
+        $success = frankenphp_ws_renameConnection($event['Connection'], $newId);
+        file_put_contents('php://stderr', "Rename test: " . ($success ? 'SUCCESS' : 'FAILED') . " - " . $event['Connection'] . " -> " . $newId . "\n");
+    }
+    
     file_put_contents('php://stderr', "Handler called with " . var_export($event, true) . "\n");
 
     if (($event['Type'] ?? null) === 'message') {

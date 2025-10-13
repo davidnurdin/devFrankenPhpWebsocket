@@ -39,4 +39,7 @@ void frankenphp_ws_listStoredInformationKeys(void* array, char* connectionId);
 void frankenphp_ws_sendToTagExpression(char* expression, char* data, int data_len, char* route);
 void frankenphp_ws_getClientsByTagExpression(void* array, char* expression);
 
+// Connection management functions
+int frankenphp_ws_renameConnection(char* currentId, char* newId);
+
 #endif

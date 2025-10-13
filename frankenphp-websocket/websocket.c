@@ -266,6 +266,21 @@ PHP_FUNCTION(frankenphp_ws_listRoutes)
     frankenphp_ws_listRoutes((void*)return_value);
 }
 
+PHP_FUNCTION(frankenphp_ws_renameConnection)
+{
+    char *currentId = NULL;
+    size_t currentId_len = 0;
+    char *newId = NULL;
+    size_t newId_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(2, 2)
+        Z_PARAM_STRING(currentId, currentId_len)
+        Z_PARAM_STRING(newId, newId_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    ZVAL_BOOL(return_value, frankenphp_ws_renameConnection(currentId, newId));
+}
+
 
 zend_module_entry ext_module_entry = {
     STANDARD_MODULE_HEADER,

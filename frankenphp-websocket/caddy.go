@@ -728,6 +728,61 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				})
 			}),
 		},
+		{
+			Pattern: "/frankenphp_ws/renameConnection/{currentId}/{newId}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodPost {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer les IDs depuis l'URL
+				currentId := r.PathValue("currentId")
+				newId := r.PathValue("newId")
+				if currentId == "" || newId == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("currentId and newId are required"),
+					}
+				}
+
+				// Décoder les IDs
+				decodedCurrentId, err := url.QueryUnescape(currentId)
+				if err != nil {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("invalid currentId encoding: %v", err),
+					}
+				}
+
+				decodedNewId, err := url.QueryUnescape(newId)
+				if err != nil {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("invalid newId encoding: %v", err),
+					}
+				}
+
+				// Effectuer le renommage
+				success := WSRenameConnection(decodedCurrentId, decodedNewId)
+				if !success {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("failed to rename connection"),
+					}
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"success":   true,
+					"currentId": decodedCurrentId,
+					"newId":     decodedNewId,
+					"message":   "Connection renamed successfully",
+				})
+			}),
+		},
 	}
 }
 
@@ -1359,6 +1414,79 @@ func WSSendToTag(tag string, data []byte, routeFilter string) int {
 	}
 
 	return sentCount
+}
+
+// RenameConnection renomme une connexion WebSocket
+func WSRenameConnection(currentId, newId string) bool {
+	// Vérifier que l'ancien ID existe
+	connIDsMutex.RLock()
+	var target *gws.Conn
+	var found bool
+	connIDs.Range(func(k, v any) bool {
+		if v.(string) == currentId {
+			target = k.(*gws.Conn)
+			found = true
+			return false
+		}
+		return true
+	})
+	connIDsMutex.RUnlock()
+
+	if !found {
+		caddy.Log().Error("WS rename failed: current connection ID not found", zap.String("currentId", currentId))
+		return false
+	}
+
+	// Vérifier que le nouvel ID n'existe pas déjà
+	connIDsMutex.RLock()
+	var newIdExists bool
+	connIDs.Range(func(_, v any) bool {
+		if v.(string) == newId {
+			newIdExists = true
+			return false
+		}
+		return true
+	})
+	connIDsMutex.RUnlock()
+
+	if newIdExists {
+		caddy.Log().Error("WS rename failed: new connection ID already exists", zap.String("newId", newId))
+		return false
+	}
+
+	// Effectuer le renommage atomiquement
+	connIDsMutex.Lock()
+	defer connIDsMutex.Unlock()
+
+	// Mettre à jour le mapping de connexion
+	connIDs.Store(target, newId)
+
+	// Mettre à jour les routes
+	connRoutesMutex.Lock()
+	if route, exists := connRoutes[currentId]; exists {
+		connRoutes[newId] = route
+		delete(connRoutes, currentId)
+	}
+	connRoutesMutex.Unlock()
+
+	// Mettre à jour les tags
+	connTagsMutex.Lock()
+	if tags, exists := connTags[currentId]; exists {
+		connTags[newId] = tags
+		delete(connTags, currentId)
+	}
+	connTagsMutex.Unlock()
+
+	// Mettre à jour les informations stockées
+	storedInfoMutex.Lock()
+	if info, exists := storedInformation[currentId]; exists {
+		storedInformation[newId] = info
+		delete(storedInformation, currentId)
+	}
+	storedInfoMutex.Unlock()
+
+	caddy.Log().Info("WS connection renamed successfully", zap.String("currentId", currentId), zap.String("newId", newId))
+	return true
 }
 
 // ===== FONCTIONS DE STOCKAGE D'INFORMATIONS =====

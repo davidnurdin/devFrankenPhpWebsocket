@@ -130,6 +130,37 @@ curl -X POST http://localhost:2019/frankenphp_ws/sendToTag/premium \
   -d "Message pour les clients premium"
 ```
 
+### 8. Renommer une connexion
+**POST** `/frankenphp_ws/renameConnection/{currentId}/{newId}`
+
+Renomme une connexion WebSocket en changeant son ID tout en préservant toutes les données associées.
+
+**Paramètres :**
+- `currentId` (URL) : L'ID actuel de la connexion WebSocket
+- `newId` (URL) : Le nouvel ID pour la connexion
+
+**Réponse de succès :**
+```json
+{
+  "success": true,
+  "currentId": "old_connection_123",
+  "newId": "user_456",
+  "message": "Connection renamed successfully"
+}
+```
+
+**Réponse d'échec :**
+```json
+{
+  "error": "failed to rename connection"
+}
+```
+
+**Exemple :**
+```bash
+curl -X POST http://localhost:2019/frankenphp_ws/renameConnection/old_123/new_456
+```
+
 ## Fonctions PHP disponibles
 
 ### `frankenphp_ws_tagClient(string $connectionId, string $tag): void`
@@ -149,6 +180,9 @@ Retourne tous les clients ayant un tag spécifique.
 
 ### `frankenphp_ws_sendToTag(string $tag, string $data): void`
 Envoie un message à tous les clients ayant un tag spécifique.
+
+### `frankenphp_ws_renameConnection(string $currentId, string $newId): bool`
+Renomme une connexion WebSocket en changeant son ID tout en préservant toutes les données associées.
 
 ## Exemples d'utilisation
 
@@ -177,6 +211,21 @@ frankenphp_ws_tagClient($connectionId, 'session_' . $sessionId);
 
 // Plus tard, retirer le tag de session
 frankenphp_ws_untagClient($connectionId, 'session_' . $sessionId);
+```
+
+### Renommage de connexions
+```php
+// Renommer une connexion avec l'ID utilisateur
+$success = frankenphp_ws_renameConnection('temp_connection_123', 'user_456');
+
+if ($success) {
+    // Toutes les données sont préservées (tags, informations stockées, route)
+    frankenphp_ws_send('user_456', json_encode(['message' => 'Connection renamed']));
+    
+    // Les tags existants sont automatiquement transférés
+    $premiumClients = frankenphp_ws_getClientsByTag('premium');
+    // 'user_456' sera dans la liste si l'ancienne connexion avait le tag 'premium'
+}
 ```
 
 ## Notes importantes

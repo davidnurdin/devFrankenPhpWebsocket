@@ -30,6 +30,7 @@ The extension exposes multiple PHP functions for WebSocket management:
 ### Connection Management
 - `frankenphp_ws_getClients()` - Returns the list of currently connected WebSocket clients
 - `frankenphp_ws_send($clientId, $message)` - Sends a message to a specific connected client
+- `frankenphp_ws_renameConnection($currentId, $newId)` - Renames a WebSocket connection ID while preserving all associated data
 
 ### Tag Management
 - `frankenphp_ws_tagClient($connectionId, $tag)` - Tags a client with a specific tag
@@ -56,6 +57,7 @@ The extension exposes multiple PHP functions for WebSocket management:
 📖 **Detailed documentation:** 
 - [STORED_INFORMATION_API.md](STORED_INFORMATION_API.md)
 - [TAG_LOGIC_API.md](TAG_LOGIC_API.md)
+- [CONNECTION_MANAGEMENT_API.md](CONNECTION_MANAGEMENT_API.md)
 
 ---
 
@@ -69,6 +71,19 @@ $clients = frankenphp_ws_getClients();
 
 foreach ($clients as $client) {
     frankenphp_ws_send($client, json_encode(['event' => 'ping', 'time' => time()]));
+}
+```
+
+### Connection Renaming
+```php
+<?php
+
+// Rename a connection while preserving all data
+$success = frankenphp_ws_renameConnection('temp_connection_123', 'user_456');
+
+if ($success) {
+    // All tags, stored information, and routes are preserved
+    frankenphp_ws_send('user_456', json_encode(['message' => 'Connection renamed successfully']));
 }
 ```
 

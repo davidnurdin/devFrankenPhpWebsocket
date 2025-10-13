@@ -35,3 +35,5 @@ function frankenphp_ws_sendToTagExpression(string $expression, string $data, ?st
 function frankenphp_ws_getClientsByTagExpression(string $expression): array {}
 
 function frankenphp_ws_listRoutes(): array {}
+
+function frankenphp_ws_renameConnection(string $currentId, string $newId): bool {}

@@ -939,3 +939,49 @@ func frankenphp_ws_listRoutes(array unsafe.Pointer) {
 
 	caddy.Log().Info("WS routes list", zap.Int("count", len(routes)), zap.Strings("routes", routes))
 }
+
+//export frankenphp_ws_renameConnection
+func frankenphp_ws_renameConnection(currentId *C.char, newId *C.char) C.int {
+	currentIdStr := C.GoString(currentId)
+	newIdStr := C.GoString(newId)
+
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS renameConnection called", zap.String("sapi", sapi), zap.String("currentId", currentIdStr), zap.String("newId", newIdStr))
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to rename connection")
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/renameConnection/%s/%s", currentIdStr, newIdStr)
+		adminRequest, err := http.NewRequest("POST", url, nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin rename request", zap.Error(err))
+			return C.int(0)
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin rename request", zap.Error(err))
+			return C.int(0)
+		}
+		defer adminResponse.Body.Close()
+
+		if adminResponse.StatusCode == http.StatusOK {
+			caddy.Log().Info("Admin rename response", zap.Int("status", adminResponse.StatusCode))
+			return C.int(1)
+		} else {
+			caddy.Log().Error("Admin rename failed", zap.Int("status", adminResponse.StatusCode))
+			return C.int(0)
+		}
+	}
+
+	// Mode Caddy/server : utilisation directe
+	success := WSRenameConnection(currentIdStr, newIdStr)
+	if success {
+		caddy.Log().Info("WS connection renamed successfully", zap.String("currentId", currentIdStr), zap.String("newId", newIdStr))
+		return C.int(1)
+	} else {
+		caddy.Log().Error("WS connection rename failed", zap.String("currentId", currentIdStr), zap.String("newId", newIdStr))
+		return C.int(0)
+	}
+}
