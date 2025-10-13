@@ -47,7 +47,15 @@ The extension exposes multiple PHP functions for WebSocket management:
 - `frankenphp_ws_hasStoredInformation($connectionId, $key)` - Checks if information exists
 - `frankenphp_ws_listStoredInformationKeys($connectionId)` - Lists all stored information keys
 
-📖 **Detailed documentation:** [STORED_INFORMATION_API.md](STORED_INFORMATION_API.md)
+### Tag Logic (NEW!)
+- `frankenphp_ws_sendToTagExpression($expression, $data)` - Sends message with boolean tag logic
+- `frankenphp_ws_getClientsByTagExpression($expression)` - Gets clients matching tag expression
+
+**Tag Logic Operators:** `&` (AND), `|` (OR), `!` (NOT), `()` (parentheses), `*` (wildcard)
+
+📖 **Detailed documentation:** 
+- [STORED_INFORMATION_API.md](STORED_INFORMATION_API.md)
+- [TAG_LOGIC_API.md](TAG_LOGIC_API.md)
 
 ---
 
@@ -110,5 +118,49 @@ foreach ($premiumClients as $client) {
 
 // Or send directly to all clients with a tag
 frankenphp_ws_sendToTag('french_speaker', json_encode(['message' => 'Bonjour!']));
+```
+
+### Tag Logic Example
+```php
+<?php
+
+// Send to men from Grenoble (AND logic)
+frankenphp_ws_sendToTagExpression('grenoble&homme', json_encode([
+    'message' => 'Événement réservé aux hommes de Grenoble'
+]));
+
+// Send to premium or VIP users (OR logic)
+frankenphp_ws_sendToTagExpression('premium|vip', json_encode([
+    'message' => 'Contenu exclusif'
+]));
+
+// Send to authenticated users who are not banned (NOT logic)
+frankenphp_ws_sendToTagExpression('authenticated&!banned', json_encode([
+    'message' => 'Notification importante'
+]));
+
+// Complex expression with parentheses
+frankenphp_ws_sendToTagExpression('(premium|vip)&(grenoble|lyon)&!banned', json_encode([
+    'message' => 'Offre spéciale locale'
+]));
+
+// Get clients matching expression
+$clients = frankenphp_ws_getClientsByTagExpression('admin&!test');
+foreach ($clients as $clientId) {
+    echo "Admin client: $clientId\n";
+}
+
+// Wildcard expressions (NEW!)
+frankenphp_ws_sendToTagExpression('group_*', json_encode([
+    'message' => 'Message to all groups'
+]));
+
+frankenphp_ws_sendToTagExpression('*admin', json_encode([
+    'message' => 'Message to all admins'
+]));
+
+frankenphp_ws_sendToTagExpression('group_*&!banned', json_encode([
+    'message' => 'Message to all groups not banned'
+]));
 ```
 

@@ -210,6 +210,35 @@ PHP_FUNCTION(frankenphp_ws_listStoredInformationKeys)
     frankenphp_ws_listStoredInformationKeys((void*)return_value, connectionId);
 }
 
+PHP_FUNCTION(frankenphp_ws_sendToTagExpression)
+{
+    char *expression = NULL;
+    size_t expression_len = 0;
+    char *data = NULL;
+    size_t data_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(2, 2)
+        Z_PARAM_STRING(expression, expression_len)
+        Z_PARAM_STRING(data, data_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    frankenphp_ws_sendToTagExpression(expression, data, (int)data_len);
+}
+
+PHP_FUNCTION(frankenphp_ws_getClientsByTagExpression)
+{
+    char *expression = NULL;
+    size_t expression_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(expression, expression_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    array_init(return_value);
+    // Go will iterate clients and call back frankenphp_ws_addClient for each
+    frankenphp_ws_getClientsByTagExpression((void*)return_value, expression);
+}
+
 
 zend_module_entry ext_module_entry = {
     STANDARD_MODULE_HEADER,

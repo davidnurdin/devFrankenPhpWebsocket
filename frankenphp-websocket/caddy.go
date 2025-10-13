@@ -10,15 +10,19 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"regexp"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/dunglas/frankenphp"
 	"github.com/lxzan/gws"
 	"go.uber.org/zap"
@@ -26,10 +30,6 @@ import (
 	"context"
 	"net/http/httputil"
 	"net/url"
-	"strings"
-	"time"
-
-	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 )
 
 func init() {
@@ -538,6 +538,93 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				return json.NewEncoder(w).Encode(map[string]any{
 					"clientID":    clientID,
 					"information": information,
+				})
+			}),
+		},
+		// ===== ENDPOINTS POUR LA LOGIQUE DE TAGS =====
+		{
+			Pattern: "/frankenphp_ws/sendToTagExpression/{expression}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodPost {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer l'expression depuis l'URL (décoder l'URL)
+				expression := r.PathValue("expression")
+				if expression == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("expression is required"),
+					}
+				}
+
+				// Décoder l'URL
+				decodedExpression, err := url.QueryUnescape(expression)
+				if err != nil {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("invalid expression encoding: %v", err),
+					}
+				}
+
+				// Lire le body de la requête
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("failed to read request body: %v", err),
+					}
+				}
+
+				// Envoyer le message à tous les clients correspondant à l'expression
+				sentCount := WSSendToTagExpression(decodedExpression, body)
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"expression": decodedExpression,
+					"sentCount":  sentCount,
+				})
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/getClientsByTagExpression/{expression}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer l'expression depuis l'URL (décoder l'URL)
+				expression := r.PathValue("expression")
+				if expression == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("expression is required"),
+					}
+				}
+
+				// Décoder l'URL
+				decodedExpression, err := url.QueryUnescape(expression)
+				if err != nil {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("invalid expression encoding: %v", err),
+					}
+				}
+
+				// Récupérer les clients correspondant à l'expression
+				clients := WSGetClientsByTagExpression(decodedExpression)
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"expression": decodedExpression,
+					"clients":    clients,
+					"count":      len(clients),
 				})
 			}),
 		},
@@ -1135,6 +1222,233 @@ func WSGetAllStoredInformation(connectionID string) map[string]string {
 		return result
 	}
 	return make(map[string]string)
+}
+
+// ===== FONCTIONS DE LOGIQUE DE TAGS =====
+
+// parseTagExpression parse une expression de tags avec logique booléenne
+// Supporte les opérateurs: & (ET), | (OU), ! (NON), () (parenthèses)
+// Exemple: "grenoble&homme", "grenoble|lyon", "!(admin&test)", "(grenoble|lyon)&homme"
+func parseTagExpression(expression string) (func(string) bool, error) {
+	// Nettoyer l'expression
+	expr := strings.ReplaceAll(strings.TrimSpace(expression), " ", "")
+	if expr == "" {
+		return nil, fmt.Errorf("empty expression")
+	}
+
+	// Parser l'expression en utilisant l'algorithme shunting yard
+	return parseBooleanExpression(expr), nil
+}
+
+// parseBooleanExpression parse une expression booléenne simple
+func parseBooleanExpression(expr string) func(string) bool {
+	return func(connectionID string) bool {
+		return evaluateExpression(expr, connectionID)
+	}
+}
+
+// evaluateExpression évalue une expression booléenne pour une connexion donnée
+func evaluateExpression(expr string, connectionID string) bool {
+	// Remplacer les tags par leurs valeurs booléennes
+	expr = expandTags(expr, connectionID)
+
+	// Évaluer l'expression booléenne
+	return evaluateBooleanExpression(expr)
+}
+
+// expandTags remplace les noms de tags par leurs valeurs booléennes (true/false)
+// Supporte les wildcards (*) pour matcher n'importe quelle séquence de caractères
+func expandTags(expr string, connectionID string) string {
+	connTagsMutex.RLock()
+	defer connTagsMutex.RUnlock()
+
+	result := expr
+
+	// Trouver tous les tags dans l'expression (incluant les wildcards)
+	// Pattern: mots commençant par lettre/underscore, pouvant contenir des wildcards (*)
+	re := regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_*]*`)
+	matches := re.FindAllString(expr, -1)
+
+	for _, tag := range matches {
+		hasTag := false
+
+		if connTags[connectionID] != nil {
+			// Vérifier si le tag contient des wildcards
+			if strings.Contains(tag, "*") {
+				hasTag = matchWildcardTag(tag, connTags[connectionID])
+			} else {
+				// Tag exact
+				hasTag = connTags[connectionID][tag]
+			}
+		}
+
+		// Remplacer le tag par true ou false
+		if hasTag {
+			result = strings.ReplaceAll(result, tag, "true")
+		} else {
+			result = strings.ReplaceAll(result, tag, "false")
+		}
+	}
+
+	return result
+}
+
+// matchWildcardTag vérifie si un tag avec wildcards correspond à au moins un tag existant
+func matchWildcardTag(wildcardTag string, userTags map[string]bool) bool {
+	// Convertir le pattern wildcard en regex
+	// Échapper les caractères spéciaux regex sauf *
+	escapedPattern := regexp.QuoteMeta(wildcardTag)
+	// Remplacer les \* échappés par .* pour matcher n'importe quoi
+	regexPattern := strings.ReplaceAll(escapedPattern, "\\*", ".*")
+
+	// Compiler le pattern regex
+	pattern, err := regexp.Compile("^" + regexPattern + "$")
+	if err != nil {
+		// Si le pattern est invalide, retourner false
+		return false
+	}
+
+	// Vérifier si au moins un tag de l'utilisateur correspond au pattern
+	for tag := range userTags {
+		if pattern.MatchString(tag) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// evaluateBooleanExpression évalue une expression booléenne simple
+func evaluateBooleanExpression(expr string) bool {
+	// Simplifier l'expression en évaluant les opérations booléennes
+	// Supporte: &, |, !, true, false, parenthèses
+
+	// Remplacer les opérateurs par des équivalents
+	expr = strings.ReplaceAll(expr, "&", "&&")
+	expr = strings.ReplaceAll(expr, "|", "||")
+
+	// Évaluer l'expression en utilisant un parser simple
+	return evaluateSimpleBoolean(expr)
+}
+
+// evaluateSimpleBoolean évalue une expression booléenne simple sans parenthèses
+func evaluateSimpleBoolean(expr string) bool {
+	// Parser simple pour les expressions booléennes
+	// Format: true, false, !true, !false, true&&false, true||false, etc.
+
+	// Gérer les négations
+	if strings.HasPrefix(expr, "!") {
+		inner := strings.TrimPrefix(expr, "!")
+		if inner == "true" {
+			return false
+		} else if inner == "false" {
+			return true
+		} else if strings.HasPrefix(inner, "(") && strings.HasSuffix(inner, ")") {
+			// Négation d'une expression parenthésée
+			innerExpr := strings.TrimPrefix(strings.TrimSuffix(inner, ")"), "(")
+			return !evaluateSimpleBoolean(innerExpr)
+		}
+	}
+
+	// Gérer les parenthèses
+	if strings.HasPrefix(expr, "(") && strings.HasSuffix(expr, ")") {
+		innerExpr := strings.TrimPrefix(strings.TrimSuffix(expr, ")"), "(")
+		return evaluateSimpleBoolean(innerExpr)
+	}
+
+	// Gérer les opérateurs AND (&&)
+	if strings.Contains(expr, "&&") {
+		parts := strings.Split(expr, "&&")
+		if len(parts) == 2 {
+			left := evaluateSimpleBoolean(strings.TrimSpace(parts[0]))
+			right := evaluateSimpleBoolean(strings.TrimSpace(parts[1]))
+			return left && right
+		}
+	}
+
+	// Gérer les opérateurs OR (||)
+	if strings.Contains(expr, "||") {
+		parts := strings.Split(expr, "||")
+		if len(parts) == 2 {
+			left := evaluateSimpleBoolean(strings.TrimSpace(parts[0]))
+			right := evaluateSimpleBoolean(strings.TrimSpace(parts[1]))
+			return left || right
+		}
+	}
+
+	// Valeurs littérales
+	if expr == "true" {
+		return true
+	} else if expr == "false" {
+		return false
+	}
+
+	// Si on arrive ici, l'expression n'est pas reconnue
+	return false
+}
+
+// SendToTagExpression envoie un message à tous les clients correspondant à une expression de tags
+func WSSendToTagExpression(expression string, data []byte) int {
+	// Parser l'expression
+	tagMatcher, err := parseTagExpression(expression)
+	if err != nil {
+		caddy.Log().Error("Error parsing tag expression", zap.String("expression", expression), zap.Error(err))
+		return 0
+	}
+
+	// Obtenir tous les clients
+	allClients := WSListClients()
+	sentCount := 0
+
+	// Filtrer les clients selon l'expression
+	for _, connectionID := range allClients {
+		if tagMatcher(connectionID) {
+			// Envoyer le message au client
+			var target *gws.Conn
+			connIDsMutex.RLock()
+			connIDs.Range(func(k, v any) bool {
+				if v.(string) == connectionID {
+					target = k.(*gws.Conn)
+					return false
+				}
+				return true
+			})
+			connIDsMutex.RUnlock()
+
+			if target != nil {
+				if err := target.WriteMessage(gws.OpcodeBinary, data); err != nil {
+					caddy.Log().Error("WS send to tag expression failed", zap.String("expression", expression), zap.String("connectionID", connectionID), zap.Error(err))
+				} else {
+					sentCount++
+				}
+			}
+		}
+	}
+
+	return sentCount
+}
+
+// GetClientsByTagExpression retourne tous les clients correspondant à une expression de tags
+func WSGetClientsByTagExpression(expression string) []string {
+	// Parser l'expression
+	tagMatcher, err := parseTagExpression(expression)
+	if err != nil {
+		caddy.Log().Error("Error parsing tag expression", zap.String("expression", expression), zap.Error(err))
+		return []string{}
+	}
+
+	// Obtenir tous les clients
+	allClients := WSListClients()
+	var matchingClients []string
+
+	// Filtrer les clients selon l'expression
+	for _, connectionID := range allClients {
+		if tagMatcher(connectionID) {
+			matchingClients = append(matchingClients, connectionID)
+		}
+	}
+
+	return matchingClients
 }
 
 // Interface guards

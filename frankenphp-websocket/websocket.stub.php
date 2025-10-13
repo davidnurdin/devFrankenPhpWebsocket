@@ -29,3 +29,7 @@ function frankenphp_ws_clearStoredInformation(string $connectionId): void {}
 function frankenphp_ws_hasStoredInformation(string $connectionId, string $key): bool {}
 
 function frankenphp_ws_listStoredInformationKeys(string $connectionId): array {}
+
+function frankenphp_ws_sendToTagExpression(string $expression, string $data): void {}
+
+function frankenphp_ws_getClientsByTagExpression(string $expression): array {}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"unsafe"
 
@@ -730,4 +731,108 @@ func frankenphp_ws_listStoredInformationKeys(array unsafe.Pointer, connectionID 
 	}
 
 	caddy.Log().Info("WS stored information keys list", zap.String("id", id), zap.Int("count", len(keys)), zap.Strings("keys", keys))
+}
+
+//export frankenphp_ws_sendToTagExpression
+func frankenphp_ws_sendToTagExpression(expression *C.char, data *C.char, dataLen C.int) {
+	exprStr := C.GoString(expression)
+	payload := C.GoBytes(unsafe.Pointer(data), dataLen)
+
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS sendToTagExpression called", zap.String("sapi", sapi), zap.String("expression", exprStr), zap.Int("dataLen", int(dataLen)))
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to send to tag expression")
+
+		// Encoder l'expression pour l'URL
+		encodedExpression := url.QueryEscape(exprStr)
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/sendToTagExpression/%s", encodedExpression)
+		adminRequest, err := http.NewRequest("POST", url, bytes.NewReader(payload))
+		if err != nil {
+			caddy.Log().Error("Error creating admin send to tag expression request", zap.Error(err))
+			return
+		}
+		adminRequest.Header.Set("Content-Type", "application/octet-stream")
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin send to tag expression request", zap.Error(err))
+			return
+		}
+		defer adminResponse.Body.Close()
+
+		caddy.Log().Info("Admin send to tag expression response", zap.Int("status", adminResponse.StatusCode))
+		return
+	}
+
+	// Mode Caddy/server : utilisation directe
+	sentCount := WSSendToTagExpression(exprStr, payload)
+	caddy.Log().Info("WS message sent to tag expression successfully", zap.String("expression", exprStr), zap.Int("sentCount", sentCount))
+}
+
+//export frankenphp_ws_getClientsByTagExpression
+func frankenphp_ws_getClientsByTagExpression(array unsafe.Pointer, expression *C.char) {
+	exprStr := C.GoString(expression)
+
+	// Protéger contre les appels concurrents
+	frankenphpWSMutex.Lock()
+	defer frankenphpWSMutex.Unlock()
+
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS getClientsByTagExpression called", zap.String("sapi", sapi), zap.String("expression", exprStr))
+
+	var clients []string
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to get clients by tag expression")
+
+		// Encoder l'expression pour l'URL
+		encodedExpression := url.QueryEscape(exprStr)
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/getClientsByTagExpression/%s", encodedExpression)
+		adminRequest, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin get clients by tag expression request", zap.Error(err))
+			return
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin get clients by tag expression request", zap.Error(err))
+			return
+		}
+		defer adminResponse.Body.Close()
+
+		body, err := io.ReadAll(adminResponse.Body)
+		if err != nil {
+			caddy.Log().Error("Error reading admin response", zap.Error(err))
+			return
+		}
+
+		var response struct {
+			Expression string   `json:"expression"`
+			Clients    []string `json:"clients"`
+			Count      int      `json:"count"`
+		}
+		err = json.Unmarshal(body, &response)
+		if err != nil {
+			caddy.Log().Error("Error unmarshalling admin response", zap.Error(err))
+			return
+		}
+
+		clients = response.Clients
+	} else {
+		// Mode Caddy/server : utilisation directe
+		clients = WSGetClientsByTagExpression(exprStr)
+	}
+
+	// Ajouter les clients au tableau PHP
+	for _, client := range clients {
+		cstr := C.CString(client)
+		C.frankenphp_ws_addClient((*C.zval)(array), cstr)
+		C.free(unsafe.Pointer(cstr))
+	}
+
+	caddy.Log().Info("WS clients by tag expression", zap.String("expression", exprStr), zap.Int("count", len(clients)), zap.Strings("clients", clients))
 }

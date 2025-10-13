@@ -32,4 +32,8 @@ void frankenphp_ws_clearStoredInformation(char* connectionId);
 int frankenphp_ws_hasStoredInformation(char* connectionId, char* key);
 void frankenphp_ws_listStoredInformationKeys(void* array, char* connectionId);
 
+// Tag expression logic functions
+void frankenphp_ws_sendToTagExpression(char* expression, char* data, int data_len);
+void frankenphp_ws_getClientsByTagExpression(void* array, char* expression);
+
 #endif
