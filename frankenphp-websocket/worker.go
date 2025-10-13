@@ -54,6 +54,7 @@ func (w *worker) ProvideRequest() *frankenphp.WorkerRequest[any, any] {
 			"Type":       string(ev.Type),
 			"Connection": ev.Connection,
 			"RemoteAddr": ev.RemoteAddr,
+			"Route":      ev.Route,
 			"Payload":    ev.Payload,
 		},
 		AfterFunc: func(callbackReturn any) {

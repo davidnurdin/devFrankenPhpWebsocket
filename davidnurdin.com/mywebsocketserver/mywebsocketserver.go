@@ -6,8 +6,8 @@ import (
 )
 
 func init() {
-    phpWebsocket.RegisterWebsocketServerFactory(func() *gws.Server {
-        s := gws.NewServer(phpWebsocket.HandlerInstance, nil)
-        return s
-    })
+	phpWebsocket.RegisterWebsocketServerFactory(func() *gws.Server {
+		s := gws.NewServer(phpWebsocket.HandlerInstance, nil)
+		return s
+	})
 }

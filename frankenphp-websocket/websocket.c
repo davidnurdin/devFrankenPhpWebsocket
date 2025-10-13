@@ -15,10 +15,17 @@ void frankenphp_ws_addClient(zval* array, const char* id)
 
 PHP_FUNCTION(frankenphp_ws_getClients)
 {
-    ZEND_PARSE_PARAMETERS_NONE();
+    char *route = NULL;
+    size_t route_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(0, 1)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_STRING(route, route_len)
+    ZEND_PARSE_PARAMETERS_END();
+
     array_init(return_value);
     // Go will iterate clients and call back frankenphp_ws_addClient for each
-    frankenphp_ws_getClients((void*)return_value);
+    frankenphp_ws_getClients((void*)return_value, route);
 }
 
 PHP_FUNCTION(frankenphp_ws_send)
@@ -27,13 +34,17 @@ PHP_FUNCTION(frankenphp_ws_send)
     size_t connectionId_len = 0;
     char *data = NULL;
     size_t data_len = 0;
+    char *route = NULL;
+    size_t route_len = 0;
 
-    ZEND_PARSE_PARAMETERS_START(2, 2)
+    ZEND_PARSE_PARAMETERS_START(2, 3)
         Z_PARAM_STRING(connectionId, connectionId_len)
         Z_PARAM_STRING(data, data_len)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_STRING(route, route_len)
     ZEND_PARSE_PARAMETERS_END();
 
-    frankenphp_ws_send(connectionId, data, (int)data_len);
+    frankenphp_ws_send(connectionId, data, (int)data_len, route);
 }
 
 PHP_FUNCTION(frankenphp_ws_tagClient)
@@ -106,13 +117,17 @@ PHP_FUNCTION(frankenphp_ws_sendToTag)
     size_t tag_len = 0;
     char *data = NULL;
     size_t data_len = 0;
+    char *route = NULL;
+    size_t route_len = 0;
 
-    ZEND_PARSE_PARAMETERS_START(2, 2)
+    ZEND_PARSE_PARAMETERS_START(2, 3)
         Z_PARAM_STRING(tag, tag_len)
         Z_PARAM_STRING(data, data_len)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_STRING(route, route_len)
     ZEND_PARSE_PARAMETERS_END();
 
-    frankenphp_ws_sendToTag(tag, data, (int)data_len);
+    frankenphp_ws_sendToTag(tag, data, (int)data_len, route);
 }
 
 PHP_FUNCTION(frankenphp_ws_setStoredInformation)
@@ -216,13 +231,17 @@ PHP_FUNCTION(frankenphp_ws_sendToTagExpression)
     size_t expression_len = 0;
     char *data = NULL;
     size_t data_len = 0;
+    char *route = NULL;
+    size_t route_len = 0;
 
-    ZEND_PARSE_PARAMETERS_START(2, 2)
+    ZEND_PARSE_PARAMETERS_START(2, 3)
         Z_PARAM_STRING(expression, expression_len)
         Z_PARAM_STRING(data, data_len)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_STRING(route, route_len)
     ZEND_PARSE_PARAMETERS_END();
 
-    frankenphp_ws_sendToTagExpression(expression, data, (int)data_len);
+    frankenphp_ws_sendToTagExpression(expression, data, (int)data_len, route);
 }
 
 PHP_FUNCTION(frankenphp_ws_getClientsByTagExpression)
@@ -237,6 +256,14 @@ PHP_FUNCTION(frankenphp_ws_getClientsByTagExpression)
     array_init(return_value);
     // Go will iterate clients and call back frankenphp_ws_addClient for each
     frankenphp_ws_getClientsByTagExpression((void*)return_value, expression);
+}
+
+PHP_FUNCTION(frankenphp_ws_listRoutes)
+{
+    ZEND_PARSE_PARAMETERS_NONE();
+    array_init(return_value);
+    // Go will iterate routes and call back frankenphp_ws_addClient for each
+    frankenphp_ws_listRoutes((void*)return_value);
 }
 
 

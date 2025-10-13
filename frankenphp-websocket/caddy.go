@@ -3,6 +3,7 @@ package websocket
 //#include "websocket.h"
 import "C"
 import (
+	"bufio"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -63,9 +64,23 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 						Err:        fmt.Errorf("method not allowed"),
 					}
 				}
+
+				// Récupérer la route depuis les query parameters
+				route := r.URL.Query().Get("route")
+
+				var clients []string
+				if route != "" {
+					// Filtrer par route
+					clients = GetClientsByRoute(route)
+				} else {
+					// Tous les clients
+					clients = WSListClients()
+				}
+
 				w.Header().Set("Content-Type", "application/json")
 				return json.NewEncoder(w).Encode(map[string]any{
-					"clients": WSListClients(),
+					"clients": clients,
+					"route":   route,
 				})
 			}),
 		},
@@ -88,6 +103,9 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 					}
 				}
 
+				// Récupérer la route depuis les query parameters
+				route := r.URL.Query().Get("route")
+
 				// Lire le body de la requête
 				body, err := io.ReadAll(r.Body)
 				if err != nil {
@@ -98,7 +116,12 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				}
 
 				// Appeler la fonction interne frankenphp_ws_send
-				C.frankenphp_ws_send(C.CString(clientID), (*C.char)(unsafe.Pointer(&body[0])), C.int(len(body)))
+				var routeC *C.char
+				if route != "" {
+					routeC = C.CString(route)
+					defer C.free(unsafe.Pointer(routeC))
+				}
+				C.frankenphp_ws_send(C.CString(clientID), (*C.char)(unsafe.Pointer(&body[0])), C.int(len(body)), routeC)
 
 				w.WriteHeader(http.StatusOK)
 				return nil
@@ -296,6 +319,9 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 					}
 				}
 
+				// Récupérer la route depuis les query parameters
+				route := r.URL.Query().Get("route")
+
 				// Lire le body de la requête
 				body, err := io.ReadAll(r.Body)
 				if err != nil {
@@ -306,11 +332,12 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				}
 
 				// Envoyer le message à tous les clients ayant ce tag
-				sentCount := WSSendToTag(tag, body)
+				sentCount := WSSendToTag(tag, body, route)
 
 				w.Header().Set("Content-Type", "application/json")
 				return json.NewEncoder(w).Encode(map[string]any{
 					"tag":       tag,
+					"route":     route,
 					"sentCount": sentCount,
 				})
 			}),
@@ -561,6 +588,9 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 					}
 				}
 
+				// Récupérer la route depuis les query parameters
+				route := r.URL.Query().Get("route")
+
 				// Décoder l'URL
 				decodedExpression, err := url.QueryUnescape(expression)
 				if err != nil {
@@ -580,11 +610,12 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				}
 
 				// Envoyer le message à tous les clients correspondant à l'expression
-				sentCount := WSSendToTagExpression(decodedExpression, body)
+				sentCount := WSSendToTagExpression(decodedExpression, body, route)
 
 				w.Header().Set("Content-Type", "application/json")
 				return json.NewEncoder(w).Encode(map[string]any{
 					"expression": decodedExpression,
+					"route":      route,
 					"sentCount":  sentCount,
 				})
 			}),
@@ -628,6 +659,75 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				})
 			}),
 		},
+		// ===== ENDPOINTS POUR LA GESTION DES ROUTES =====
+		{
+			Pattern: "/frankenphp_ws/getAllRoutes",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer toutes les routes uniques
+				connRoutesMutex.RLock()
+				routeSet := make(map[string]bool)
+				for _, route := range connRoutes {
+					routeSet[route] = true
+				}
+				connRoutesMutex.RUnlock()
+
+				var routes []string
+				for route := range routeSet {
+					routes = append(routes, route)
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"routes": routes,
+				})
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/getClientsByRoute/{route}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer la route depuis l'URL
+				route := r.PathValue("route")
+				if route == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("route is required"),
+					}
+				}
+
+				// Décoder l'URL
+				decodedRoute, err := url.QueryUnescape(route)
+				if err != nil {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("invalid route encoding: %v", err),
+					}
+				}
+
+				// Récupérer les clients sur cette route
+				clients := GetClientsByRoute(decodedRoute)
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"route":   decodedRoute,
+					"clients": clients,
+					"count":   len(clients),
+				})
+			}),
+		},
 	}
 }
 
@@ -651,7 +751,18 @@ func (h *MyHandler) OnMessage(socket *gws.Conn, message *gws.Message) {
 	println("Message reçu :", string(data))
 
 	id := getConnID(socket)
-	w.events <- Event{Type: EventMessage, Connection: id, RemoteAddr: socket.RemoteAddr().String(), Payload: string(data)}
+
+	// Récupérer la route pour cette connexion
+	connRoutesMutex.RLock()
+	route := connRoutes[id]
+	connRoutesMutex.RUnlock()
+	if route == "" {
+		route = "/unknown" // Route par défaut si non trouvée
+	}
+
+	// route = "/default"
+
+	w.events <- Event{Type: EventMessage, Connection: id, RemoteAddr: socket.RemoteAddr().String(), Route: route, Payload: string(data)}
 
 	// socket.WriteString("Message reçu !")
 
@@ -668,9 +779,23 @@ func (h *MyHandler) OnOpen(socket *gws.Conn) {
 	connIDsMutex.Lock()
 	connIDs.Store(socket, id)
 	connIDsMutex.Unlock()
-	println("Nouvelle connexion " + id)
+
+	// Récupérer la route temporairement stockée
+	route := GetAndRemoveTempRoute(socket.RemoteAddr().String())
+	if route == "" {
+		route = "/unknown" // Route par défaut si non trouvée
+	}
+
+	// route = "/default"
+
+	// Stocker la route pour cette connexion
+	connRoutesMutex.Lock()
+	connRoutes[id] = route
+	connRoutesMutex.Unlock()
+
+	println("Nouvelle connexion " + id + " sur la route " + route)
 	// Publie un événement d'ouverture (pas de réponse attendue)
-	w.events <- Event{Type: EventOpen, Connection: id, RemoteAddr: socket.RemoteAddr().String()}
+	w.events <- Event{Type: EventOpen, Connection: id, RemoteAddr: socket.RemoteAddr().String(), Route: route}
 }
 
 func (h *MyHandler) OnClose(socket *gws.Conn, err error) {
@@ -682,17 +807,31 @@ func (h *MyHandler) OnClose(socket *gws.Conn, err error) {
 		connIDs.Delete(socket)
 		connIDsMutex.Unlock()
 
+		// Récupérer la route avant de nettoyer
+		connRoutesMutex.RLock()
+		route := connRoutes[connectionID]
+		connRoutesMutex.RUnlock()
+
 		// Nettoyer les tags de cette connexion
 		WSClearTagsClient(connectionID)
 
 		// Nettoyer les informations stockées de cette connexion
 		WSClearStoredInformation(connectionID)
 
-		w.events <- Event{Type: EventClose, Connection: connectionID, RemoteAddr: socket.RemoteAddr().String(), Payload: err}
+		// Nettoyer la route de cette connexion
+		connRoutesMutex.Lock()
+		delete(connRoutes, connectionID)
+		connRoutesMutex.Unlock()
+
+		if route == "" {
+			route = "/unknown"
+		}
+
+		w.events <- Event{Type: EventClose, Connection: connectionID, RemoteAddr: socket.RemoteAddr().String(), Route: route, Payload: err}
 		return
 	}
 	connIDsMutex.Unlock()
-	w.events <- Event{Type: EventClose, Connection: "", RemoteAddr: socket.RemoteAddr().String(), Payload: err}
+	w.events <- Event{Type: EventClose, Connection: "", RemoteAddr: socket.RemoteAddr().String(), Route: "/unknown", Payload: err}
 }
 
 var connIDs sync.Map             // *gws.Conn -> string
@@ -706,6 +845,14 @@ var connTagsMutex sync.RWMutex                  // Protège les accès concurren
 // Système de stockage d'informations pour les connexions WebSocket
 var storedInformation = make(map[string]map[string]string) // connectionID -> map[key]value
 var storedInfoMutex sync.RWMutex                           // Protège les accès concurrents à storedInformation
+
+// Système de stockage des routes pour les connexions WebSocket
+var connRoutes = make(map[string]string) // connectionID -> route
+var connRoutesMutex sync.RWMutex         // Protège les accès concurrents à connRoutes
+
+// Stockage temporaire des routes en cours de connexion (par adresse IP)
+var tempRoutes = make(map[string]string) // remoteAddr -> route
+var tempRoutesMutex sync.RWMutex         // Protège les accès concurrents à tempRoutes
 
 func newConnID() string {
 	b := make([]byte, 16)
@@ -728,6 +875,67 @@ func getConnID(c *gws.Conn) string {
 	connIDs.Store(c, id)
 	connIDsMutex.Unlock()
 	return id
+}
+
+// StoreTempRoute stocke temporairement une route par adresse IP
+func StoreTempRoute(remoteAddr, route string) {
+	tempRoutesMutex.Lock()
+	defer tempRoutesMutex.Unlock()
+	tempRoutes[remoteAddr] = route
+}
+
+// GetAndRemoveTempRoute récupère et supprime la route temporaire pour une adresse IP
+func GetAndRemoveTempRoute(remoteAddr string) string {
+	tempRoutesMutex.Lock()
+	defer tempRoutesMutex.Unlock()
+	route, exists := tempRoutes[remoteAddr]
+	if exists {
+		delete(tempRoutes, remoteAddr)
+	}
+	return route
+}
+
+// GetClientRoute récupère la route d'une connexion
+func GetClientRoute(connectionID string) string {
+	connRoutesMutex.RLock()
+	defer connRoutesMutex.RUnlock()
+	route, exists := connRoutes[connectionID]
+	if exists {
+		return route
+	}
+	return ""
+}
+
+// GetClientsByRoute récupère tous les clients connectés sur une route spécifique
+func GetClientsByRoute(route string) []string {
+	connRoutesMutex.RLock()
+	defer connRoutesMutex.RUnlock()
+
+	var clients []string
+	for connectionID, clientRoute := range connRoutes {
+		if clientRoute == route {
+			clients = append(clients, connectionID)
+		}
+	}
+	return clients
+}
+
+// WSGetAllRoutes retourne toutes les routes actives (uniques)
+func WSGetAllRoutes() []string {
+	connRoutesMutex.RLock()
+	defer connRoutesMutex.RUnlock()
+
+	routeSet := make(map[string]bool)
+	for _, route := range connRoutes {
+		routeSet[route] = true
+	}
+
+	var routes []string
+	for route := range routeSet {
+		routes = append(routes, route)
+	}
+
+	return routes
 }
 
 var HandlerInstance = &MyHandler{}
@@ -834,6 +1042,9 @@ func (h WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyh
 			)
 		}
 
+		// print the route in caddy log
+		h.app.logger.Info("Route", zap.String("route", r.URL.Path))
+
 		// Reverse-proxy the upgrade request to the local websocket server (127.0.0.1:5000)
 		if h.app != nil {
 			// Lazy-init proxy if needed (app Start may not have run yet when handler is hit early)
@@ -910,6 +1121,17 @@ func (g Websocket) Start() error {
 	}
 
 	g.srv = websocketServerFactory()
+
+	g.srv.OnRequest = func(conn net.Conn, br *bufio.Reader, r *http.Request) {
+		StoreTempRoute(conn.RemoteAddr().String(), r.URL.Path)
+		socket, err := g.srv.GetUpgrader().UpgradeFromConn(conn, br, r)
+		if err != nil {
+			g.srv.OnError(conn, err)
+		} else {
+			socket.ReadLoop()
+		}
+	}
+
 	go func() {
 		if err := g.srv.RunListener(ln); err != nil {
 			g.logger.Panic("failed to start websocket server", zap.Error(err))
@@ -1102,11 +1324,19 @@ func WSGetAllTags() []string {
 }
 
 // SendToTag envoie un message à tous les clients ayant un tag spécifique
-func WSSendToTag(tag string, data []byte) int {
+func WSSendToTag(tag string, data []byte, routeFilter string) int {
 	clients := WSGetClientsByTag(tag)
 	sentCount := 0
 
 	for _, connectionID := range clients {
+		// Si un filtre de route est spécifié, vérifier que la connexion est sur cette route
+		if routeFilter != "" {
+			clientRoute := GetClientRoute(connectionID)
+			if clientRoute != routeFilter {
+				continue // Ignorer cette connexion si elle n'est pas sur la route demandée
+			}
+		}
+
 		// Trouver la connexion WebSocket
 		var target *gws.Conn
 		connIDsMutex.RLock()
@@ -1121,7 +1351,7 @@ func WSSendToTag(tag string, data []byte) int {
 
 		if target != nil {
 			if err := target.WriteMessage(gws.OpcodeBinary, data); err != nil {
-				caddy.Log().Error("WS send to tag failed", zap.String("tag", tag), zap.String("connectionID", connectionID), zap.Error(err))
+				caddy.Log().Error("WS send to tag failed", zap.String("tag", tag), zap.String("connectionID", connectionID), zap.String("route", routeFilter), zap.Error(err))
 			} else {
 				sentCount++
 			}
@@ -1388,7 +1618,7 @@ func evaluateSimpleBoolean(expr string) bool {
 }
 
 // SendToTagExpression envoie un message à tous les clients correspondant à une expression de tags
-func WSSendToTagExpression(expression string, data []byte) int {
+func WSSendToTagExpression(expression string, data []byte, routeFilter string) int {
 	// Parser l'expression
 	tagMatcher, err := parseTagExpression(expression)
 	if err != nil {
@@ -1403,6 +1633,14 @@ func WSSendToTagExpression(expression string, data []byte) int {
 	// Filtrer les clients selon l'expression
 	for _, connectionID := range allClients {
 		if tagMatcher(connectionID) {
+			// Si un filtre de route est spécifié, vérifier que la connexion est sur cette route
+			if routeFilter != "" {
+				clientRoute := GetClientRoute(connectionID)
+				if clientRoute != routeFilter {
+					continue // Ignorer cette connexion si elle n'est pas sur la route demandée
+				}
+			}
+
 			// Envoyer le message au client
 			var target *gws.Conn
 			connIDsMutex.RLock()
@@ -1417,7 +1655,7 @@ func WSSendToTagExpression(expression string, data []byte) int {
 
 			if target != nil {
 				if err := target.WriteMessage(gws.OpcodeBinary, data); err != nil {
-					caddy.Log().Error("WS send to tag expression failed", zap.String("expression", expression), zap.String("connectionID", connectionID), zap.Error(err))
+					caddy.Log().Error("WS send to tag expression failed", zap.String("expression", expression), zap.String("connectionID", connectionID), zap.String("route", routeFilter), zap.Error(err))
 				} else {
 					sentCount++
 				}

@@ -1,12 +1,14 @@
 /* This is a generated file, edit the .stub.php file instead.
- * Stub hash: 73cbc9ae9e4ec109bbd240a389cbe37047c44e36 */
+ * Stub hash: bd9ded7fe86064bef3d09d5d9347877421607a35 */
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getClients, 0, 0, IS_ARRAY, 0)
+	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, route, IS_STRING, 1, "null")
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_send, 0, 2, IS_VOID, 0)
 	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
 	ZEND_ARG_TYPE_INFO(0, data, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, route, IS_STRING, 1, "null")
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_tagClient, 0, 2, IS_VOID, 0)
@@ -20,7 +22,8 @@ ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_clearTagClient, 0,
 	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
 ZEND_END_ARG_INFO()
 
-#define arginfo_frankenphp_ws_getTags arginfo_frankenphp_ws_getClients
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getTags, 0, 0, IS_ARRAY, 0)
+ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getClientsByTag, 0, 1, IS_ARRAY, 0)
 	ZEND_ARG_TYPE_INFO(0, tag, IS_STRING, 0)
@@ -29,6 +32,7 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_sendToTag, 0, 2, IS_VOID, 0)
 	ZEND_ARG_TYPE_INFO(0, tag, IS_STRING, 0)
 	ZEND_ARG_TYPE_INFO(0, data, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, route, IS_STRING, 1, "null")
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_setStoredInformation, 0, 3, IS_VOID, 0)
@@ -61,11 +65,14 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_sendToTagExpression, 0, 2, IS_VOID, 0)
 	ZEND_ARG_TYPE_INFO(0, expression, IS_STRING, 0)
 	ZEND_ARG_TYPE_INFO(0, data, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, route, IS_STRING, 1, "null")
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getClientsByTagExpression, 0, 1, IS_ARRAY, 0)
 	ZEND_ARG_TYPE_INFO(0, expression, IS_STRING, 0)
 ZEND_END_ARG_INFO()
+
+#define arginfo_frankenphp_ws_listRoutes arginfo_frankenphp_ws_getTags
 
 ZEND_FUNCTION(frankenphp_ws_getClients);
 ZEND_FUNCTION(frankenphp_ws_send);
@@ -83,6 +90,7 @@ ZEND_FUNCTION(frankenphp_ws_hasStoredInformation);
 ZEND_FUNCTION(frankenphp_ws_listStoredInformationKeys);
 ZEND_FUNCTION(frankenphp_ws_sendToTagExpression);
 ZEND_FUNCTION(frankenphp_ws_getClientsByTagExpression);
+ZEND_FUNCTION(frankenphp_ws_listRoutes);
 
 static const zend_function_entry ext_functions[] = {
 	ZEND_FE(frankenphp_ws_getClients, arginfo_frankenphp_ws_getClients)
@@ -101,5 +109,6 @@ static const zend_function_entry ext_functions[] = {
 	ZEND_FE(frankenphp_ws_listStoredInformationKeys, arginfo_frankenphp_ws_listStoredInformationKeys)
 	ZEND_FE(frankenphp_ws_sendToTagExpression, arginfo_frankenphp_ws_sendToTagExpression)
 	ZEND_FE(frankenphp_ws_getClientsByTagExpression, arginfo_frankenphp_ws_getClientsByTagExpression)
+	ZEND_FE(frankenphp_ws_listRoutes, arginfo_frankenphp_ws_listRoutes)
 	ZEND_FE_END
 };

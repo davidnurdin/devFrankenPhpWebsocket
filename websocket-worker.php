@@ -20,9 +20,9 @@ $handler = static function (array $event): array  {
     file_put_contents('php://stderr', "Handler called with " . var_export($event, true) . "\n");
 
     if (($event['Type'] ?? null) === 'message') {
-        foreach (frankenphp_ws_getClients() as $client)
+        foreach (frankenphp_ws_getClients($event['Route']) as $client)
         {
-            frankenphp_ws_send($client,"MSG FROM ANOTHER WS => " . (string)($event['Payload']));
+            frankenphp_ws_send($client,"MSG FROM ANOTHER WS (from route : " . $event['Route'] . " ) => " . (string)($event['Payload']));
         }
 
         

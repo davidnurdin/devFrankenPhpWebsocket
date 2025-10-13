@@ -47,6 +47,7 @@ type Event struct {
 	Type       EventType
 	Connection string
 	RemoteAddr string
+	Route      string
 	Payload    any
 	ResponseCh chan any
 }
@@ -63,7 +64,7 @@ func HandleRequest(request any) any {
 }
 
 //export frankenphp_ws_getClients
-func frankenphp_ws_getClients(array unsafe.Pointer) {
+func frankenphp_ws_getClients(array unsafe.Pointer, route *C.char) {
 	// Protéger contre les appels concurrents qui peuvent causer des crashes
 	frankenphpWSMutex.Lock()
 	defer frankenphpWSMutex.Unlock()
@@ -72,13 +73,26 @@ func frankenphp_ws_getClients(array unsafe.Pointer) {
 	// print it
 	caddy.Log().Info("SAPI:", zap.String("sapi", sapi))
 
+	// Récupérer le paramètre route
+	routeStr := ""
+	if route != nil {
+		routeStr = C.GoString(route)
+	}
+
 	// Déclarer ids avant le if pour qu'elle soit accessible partout
 	var ids []string
 
 	// si sapi == cli , on fait une requête admin vers le serveur Caddy
 	if sapi == "cli" {
 		caddy.Log().Info("Making admin request to Caddy server")
-		adminRequest, err := http.NewRequest("GET", "http://localhost:2019/frankenphp_ws/getClients", nil)
+
+		// Construire l'URL avec le paramètre route si spécifié
+		requestURL := "http://localhost:2019/frankenphp_ws/getClients"
+		if routeStr != "" {
+			requestURL = fmt.Sprintf("http://localhost:2019/frankenphp_ws/getClients?route=%s", url.QueryEscape(routeStr))
+		}
+
+		adminRequest, err := http.NewRequest("GET", requestURL, nil)
 		if err != nil {
 			caddy.Log().Error("Error creating admin request", zap.Error(err))
 			return
@@ -112,7 +126,13 @@ func frankenphp_ws_getClients(array unsafe.Pointer) {
 		caddy.Log().Info("Admin response clients", zap.Strings("clients", ids))
 
 	} else {
-		ids = WSListClients()
+		if routeStr != "" {
+			// Filtrer par route
+			ids = GetClientsByRoute(routeStr)
+		} else {
+			// Tous les clients
+			ids = WSListClients()
+		}
 	}
 
 	for _, id := range ids {
@@ -127,13 +147,17 @@ func frankenphp_ws_getClients(array unsafe.Pointer) {
 }
 
 //export frankenphp_ws_send
-func frankenphp_ws_send(connectionId *C.char, data *C.char, dataLen C.int) {
+func frankenphp_ws_send(connectionId *C.char, data *C.char, dataLen C.int, route *C.char) {
 	// Détecter le SAPI
 	sapi := getCurrentSAPI()
 	caddy.Log().Info("WS send called", zap.String("sapi", sapi), zap.Int("dataLen", int(dataLen)))
 
 	id := C.GoString(connectionId)
 	payload := C.GoBytes(unsafe.Pointer(data), dataLen)
+	routeStr := ""
+	if route != nil {
+		routeStr = C.GoString(route)
+	}
 
 	// si sapi == cli , on fait une requête admin vers le serveur Caddy
 	if sapi == "cli" {
@@ -161,6 +185,18 @@ func frankenphp_ws_send(connectionId *C.char, data *C.char, dataLen C.int) {
 	}
 
 	// Mode Caddy/server : utilisation directe
+	// Si une route est spécifiée, vérifier que la connexion est sur cette route
+	if routeStr != "" {
+		clientRoute := GetClientRoute(id)
+		if clientRoute != routeStr {
+			caddy.Log().Warn("WS send: connection not on specified route",
+				zap.String("id", id),
+				zap.String("requestedRoute", routeStr),
+				zap.String("actualRoute", clientRoute))
+			return
+		}
+	}
+
 	// find the *gws.Conn by id and send data
 	var target *gws.Conn
 	connIDsMutex.RLock()
@@ -184,7 +220,7 @@ func frankenphp_ws_send(connectionId *C.char, data *C.char, dataLen C.int) {
 		return
 	}
 
-	caddy.Log().Info("WS message sent successfully", zap.String("id", id))
+	caddy.Log().Info("WS message sent successfully", zap.String("id", id), zap.String("route", routeStr))
 }
 
 //export frankenphp_ws_tagClient
@@ -411,12 +447,16 @@ func frankenphp_ws_getClientsByTag(array unsafe.Pointer, tag *C.char) {
 }
 
 //export frankenphp_ws_sendToTag
-func frankenphp_ws_sendToTag(tag *C.char, data *C.char, dataLen C.int) {
+func frankenphp_ws_sendToTag(tag *C.char, data *C.char, dataLen C.int, route *C.char) {
 	tagStr := C.GoString(tag)
 	payload := C.GoBytes(unsafe.Pointer(data), dataLen)
+	routeStr := ""
+	if route != nil {
+		routeStr = C.GoString(route)
+	}
 
 	sapi := getCurrentSAPI()
-	caddy.Log().Info("WS sendToTag called", zap.String("sapi", sapi), zap.String("tag", tagStr), zap.Int("dataLen", int(dataLen)))
+	caddy.Log().Info("WS sendToTag called", zap.String("sapi", sapi), zap.String("tag", tagStr), zap.String("route", routeStr), zap.Int("dataLen", int(dataLen)))
 
 	if sapi == "cli" {
 		// Faire une requête admin vers le serveur Caddy
@@ -442,8 +482,8 @@ func frankenphp_ws_sendToTag(tag *C.char, data *C.char, dataLen C.int) {
 	}
 
 	// Mode Caddy/server : utilisation directe
-	sentCount := WSSendToTag(tagStr, payload)
-	caddy.Log().Info("WS message sent to tag successfully", zap.String("tag", tagStr), zap.Int("sentCount", sentCount))
+	sentCount := WSSendToTag(tagStr, payload, routeStr)
+	caddy.Log().Info("WS message sent to tag successfully", zap.String("tag", tagStr), zap.String("route", routeStr), zap.Int("sentCount", sentCount))
 }
 
 //export frankenphp_ws_setStoredInformation
@@ -734,12 +774,16 @@ func frankenphp_ws_listStoredInformationKeys(array unsafe.Pointer, connectionID 
 }
 
 //export frankenphp_ws_sendToTagExpression
-func frankenphp_ws_sendToTagExpression(expression *C.char, data *C.char, dataLen C.int) {
+func frankenphp_ws_sendToTagExpression(expression *C.char, data *C.char, dataLen C.int, route *C.char) {
 	exprStr := C.GoString(expression)
 	payload := C.GoBytes(unsafe.Pointer(data), dataLen)
+	routeStr := ""
+	if route != nil {
+		routeStr = C.GoString(route)
+	}
 
 	sapi := getCurrentSAPI()
-	caddy.Log().Info("WS sendToTagExpression called", zap.String("sapi", sapi), zap.String("expression", exprStr), zap.Int("dataLen", int(dataLen)))
+	caddy.Log().Info("WS sendToTagExpression called", zap.String("sapi", sapi), zap.String("expression", exprStr), zap.String("route", routeStr), zap.Int("dataLen", int(dataLen)))
 
 	if sapi == "cli" {
 		// Faire une requête admin vers le serveur Caddy
@@ -767,8 +811,8 @@ func frankenphp_ws_sendToTagExpression(expression *C.char, data *C.char, dataLen
 	}
 
 	// Mode Caddy/server : utilisation directe
-	sentCount := WSSendToTagExpression(exprStr, payload)
-	caddy.Log().Info("WS message sent to tag expression successfully", zap.String("expression", exprStr), zap.Int("sentCount", sentCount))
+	sentCount := WSSendToTagExpression(exprStr, payload, routeStr)
+	caddy.Log().Info("WS message sent to tag expression successfully", zap.String("expression", exprStr), zap.String("route", routeStr), zap.Int("sentCount", sentCount))
 }
 
 //export frankenphp_ws_getClientsByTagExpression
@@ -835,4 +879,63 @@ func frankenphp_ws_getClientsByTagExpression(array unsafe.Pointer, expression *C
 	}
 
 	caddy.Log().Info("WS clients by tag expression", zap.String("expression", exprStr), zap.Int("count", len(clients)), zap.Strings("clients", clients))
+}
+
+//export frankenphp_ws_listRoutes
+func frankenphp_ws_listRoutes(array unsafe.Pointer) {
+	// Protéger contre les appels concurrents
+	frankenphpWSMutex.Lock()
+	defer frankenphpWSMutex.Unlock()
+
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS listRoutes called", zap.String("sapi", sapi))
+
+	var routes []string
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to get all routes")
+
+		adminRequest, err := http.NewRequest("GET", "http://localhost:2019/frankenphp_ws/getAllRoutes", nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin get routes request", zap.Error(err))
+			return
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin get routes request", zap.Error(err))
+			return
+		}
+		defer adminResponse.Body.Close()
+
+		body, err := io.ReadAll(adminResponse.Body)
+		if err != nil {
+			caddy.Log().Error("Error reading admin response", zap.Error(err))
+			return
+		}
+
+		var response struct {
+			Routes []string `json:"routes"`
+		}
+		err = json.Unmarshal(body, &response)
+		if err != nil {
+			caddy.Log().Error("Error unmarshalling admin response", zap.Error(err))
+			return
+		}
+
+		routes = response.Routes
+	} else {
+		// Mode Caddy/server : utilisation directe
+		routes = WSGetAllRoutes()
+	}
+
+	// Ajouter les routes au tableau PHP
+	for _, route := range routes {
+		cstr := C.CString(route)
+		C.frankenphp_ws_addClient((*C.zval)(array), cstr)
+		C.free(unsafe.Pointer(cstr))
+	}
+
+	caddy.Log().Info("WS routes list", zap.Int("count", len(routes)), zap.Strings("routes", routes))
 }
