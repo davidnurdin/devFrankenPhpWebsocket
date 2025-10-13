@@ -1,5 +1,5 @@
 /* This is a generated file, edit the .stub.php file instead.
- * Stub hash: 5eea73fce8bd679f070ce57e3a1b3d667afe1a0e */
+ * Stub hash: 507ae8928e385f6e94c1ba40ee950e3f0ebb7611 */
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getClients, 0, 0, IS_ARRAY, 0)
 ZEND_END_ARG_INFO()
@@ -31,6 +31,33 @@ ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_sendToTag, 0, 2, I
 	ZEND_ARG_TYPE_INFO(0, data, IS_STRING, 0)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_setStoredInformation, 0, 3, IS_VOID, 0)
+	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, key, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, value, IS_STRING, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getStoredInformation, 0, 2, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, key, IS_STRING, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_deleteStoredInformation, 0, 2, IS_VOID, 0)
+	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, key, IS_STRING, 0)
+ZEND_END_ARG_INFO()
+
+#define arginfo_frankenphp_ws_clearStoredInformation arginfo_frankenphp_ws_clearTagClient
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_hasStoredInformation, 0, 2, _IS_BOOL, 0)
+	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, key, IS_STRING, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_listStoredInformationKeys, 0, 1, IS_ARRAY, 0)
+	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
+ZEND_END_ARG_INFO()
+
 ZEND_FUNCTION(frankenphp_ws_getClients);
 ZEND_FUNCTION(frankenphp_ws_send);
 ZEND_FUNCTION(frankenphp_ws_tagClient);
@@ -39,6 +66,12 @@ ZEND_FUNCTION(frankenphp_ws_clearTagClient);
 ZEND_FUNCTION(frankenphp_ws_getTags);
 ZEND_FUNCTION(frankenphp_ws_getClientsByTag);
 ZEND_FUNCTION(frankenphp_ws_sendToTag);
+ZEND_FUNCTION(frankenphp_ws_setStoredInformation);
+ZEND_FUNCTION(frankenphp_ws_getStoredInformation);
+ZEND_FUNCTION(frankenphp_ws_deleteStoredInformation);
+ZEND_FUNCTION(frankenphp_ws_clearStoredInformation);
+ZEND_FUNCTION(frankenphp_ws_hasStoredInformation);
+ZEND_FUNCTION(frankenphp_ws_listStoredInformationKeys);
 
 static const zend_function_entry ext_functions[] = {
 	ZEND_FE(frankenphp_ws_getClients, arginfo_frankenphp_ws_getClients)
@@ -49,5 +82,11 @@ static const zend_function_entry ext_functions[] = {
 	ZEND_FE(frankenphp_ws_getTags, arginfo_frankenphp_ws_getTags)
 	ZEND_FE(frankenphp_ws_getClientsByTag, arginfo_frankenphp_ws_getClientsByTag)
 	ZEND_FE(frankenphp_ws_sendToTag, arginfo_frankenphp_ws_sendToTag)
+	ZEND_FE(frankenphp_ws_setStoredInformation, arginfo_frankenphp_ws_setStoredInformation)
+	ZEND_FE(frankenphp_ws_getStoredInformation, arginfo_frankenphp_ws_getStoredInformation)
+	ZEND_FE(frankenphp_ws_deleteStoredInformation, arginfo_frankenphp_ws_deleteStoredInformation)
+	ZEND_FE(frankenphp_ws_clearStoredInformation, arginfo_frankenphp_ws_clearStoredInformation)
+	ZEND_FE(frankenphp_ws_hasStoredInformation, arginfo_frankenphp_ws_hasStoredInformation)
+	ZEND_FE(frankenphp_ws_listStoredInformationKeys, arginfo_frankenphp_ws_listStoredInformationKeys)
 	ZEND_FE_END
 };

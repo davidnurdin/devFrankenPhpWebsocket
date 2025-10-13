@@ -25,20 +25,35 @@ It allows PHP developers to manage WebSocket connections **directly from PHP cod
 
 ## 🧠 Available PHP Functions
 
-Two PHP functions are exposed by the extension:
+The extension exposes multiple PHP functions for WebSocket management:
 
-### `frankenphp_ws_getClients()`
-Returns the list of currently connected WebSocket clients.  
-You can use this to iterate through clients and broadcast messages.
+### Connection Management
+- `frankenphp_ws_getClients()` - Returns the list of currently connected WebSocket clients
+- `frankenphp_ws_send($clientId, $message)` - Sends a message to a specific connected client
 
-### `frankenphp_ws_send($clientId, $message)`
-Sends a message to a specific connected client.  
-Ideal for targeted communication or server push scenarios.
+### Tag Management
+- `frankenphp_ws_tagClient($connectionId, $tag)` - Tags a client with a specific tag
+- `frankenphp_ws_untagClient($connectionId, $tag)` - Removes a tag from a client
+- `frankenphp_ws_clearTagClient($connectionId)` - Removes all tags from a client
+- `frankenphp_ws_getTags()` - Returns all available tags
+- `frankenphp_ws_getClientsByTag($tag)` - Returns clients with a specific tag
+- `frankenphp_ws_sendToTag($tag, $data)` - Sends a message to all clients with a tag
+
+### Information Storage
+- `frankenphp_ws_setStoredInformation($connectionId, $key, $value)` - Stores information for a connection
+- `frankenphp_ws_getStoredInformation($connectionId, $key)` - Retrieves stored information
+- `frankenphp_ws_deleteStoredInformation($connectionId, $key)` - Deletes specific information
+- `frankenphp_ws_clearStoredInformation($connectionId)` - Clears all information for a connection
+- `frankenphp_ws_hasStoredInformation($connectionId, $key)` - Checks if information exists
+- `frankenphp_ws_listStoredInformationKeys($connectionId)` - Lists all stored information keys
+
+📖 **Detailed documentation:** [STORED_INFORMATION_API.md](STORED_INFORMATION_API.md)
 
 ---
 
 ## 🚀 Example Usage (PHP)
 
+### Basic WebSocket Communication
 ```php
 <?php
 
@@ -47,4 +62,53 @@ $clients = frankenphp_ws_getClients();
 foreach ($clients as $client) {
     frankenphp_ws_send($client, json_encode(['event' => 'ping', 'time' => time()]));
 }
+```
+
+### Information Storage Example
+```php
+<?php
+
+// Store user information when they connect
+$connectionId = 'client_12345';
+frankenphp_ws_setStoredInformation($connectionId, 'user_id', '12345');
+frankenphp_ws_setStoredInformation($connectionId, 'username', 'john_doe');
+frankenphp_ws_setStoredInformation($connectionId, 'language', 'fr');
+
+// Retrieve and use stored information
+if (frankenphp_ws_hasStoredInformation($connectionId, 'user_id')) {
+    $userId = frankenphp_ws_getStoredInformation($connectionId, 'user_id');
+    $username = frankenphp_ws_getStoredInformation($connectionId, 'username');
+    
+    // Send personalized message
+    frankenphp_ws_send($connectionId, json_encode([
+        'message' => "Welcome back, $username!",
+        'user_id' => $userId
+    ]));
+}
+
+// List all stored information keys
+$keys = frankenphp_ws_listStoredInformationKeys($connectionId);
+foreach ($keys as $key) {
+    $value = frankenphp_ws_getStoredInformation($connectionId, $key);
+    echo "Stored: $key = $value\n";
+}
+```
+
+### Tag Management Example
+```php
+<?php
+
+// Tag clients by their role
+frankenphp_ws_tagClient($connectionId, 'premium_user');
+frankenphp_ws_tagClient($connectionId, 'french_speaker');
+
+// Send message to all premium users
+$premiumClients = frankenphp_ws_getClientsByTag('premium_user');
+foreach ($premiumClients as $client) {
+    frankenphp_ws_send($client, json_encode(['event' => 'premium_offer']));
+}
+
+// Or send directly to all clients with a tag
+frankenphp_ws_sendToTag('french_speaker', json_encode(['message' => 'Bonjour!']));
+```
 

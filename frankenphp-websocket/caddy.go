@@ -315,6 +315,232 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				})
 			}),
 		},
+		// ===== ENDPOINTS POUR LE STOCKAGE D'INFORMATIONS =====
+		{
+			Pattern: "/frankenphp_ws/setStoredInformation/{clientID}/{key}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodPost {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer le clientID et la clé depuis l'URL
+				clientID := r.PathValue("clientID")
+				key := r.PathValue("key")
+				if clientID == "" || key == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("clientID and key are required"),
+					}
+				}
+
+				// Lire la valeur depuis le body de la requête
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("failed to read request body: %v", err),
+					}
+				}
+
+				value := string(body)
+				if value == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("value is required"),
+					}
+				}
+
+				// Appeler la fonction interne pour stocker l'information
+				WSSetStoredInformation(clientID, key, value)
+
+				w.WriteHeader(http.StatusOK)
+				return nil
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/getStoredInformation/{clientID}/{key}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer le clientID et la clé depuis l'URL
+				clientID := r.PathValue("clientID")
+				key := r.PathValue("key")
+				if clientID == "" || key == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("clientID and key are required"),
+					}
+				}
+
+				// Récupérer l'information stockée
+				value, exists := WSGetStoredInformation(clientID, key)
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"clientID": clientID,
+					"key":      key,
+					"value":    value,
+					"exists":   exists,
+				})
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/deleteStoredInformation/{clientID}/{key}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodDelete {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer le clientID et la clé depuis l'URL
+				clientID := r.PathValue("clientID")
+				key := r.PathValue("key")
+				if clientID == "" || key == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("clientID and key are required"),
+					}
+				}
+
+				// Supprimer l'information stockée
+				success := WSDeleteStoredInformation(clientID, key)
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"clientID": clientID,
+					"key":      key,
+					"deleted":  success,
+				})
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/clearStoredInformation/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodDelete {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer le clientID depuis l'URL
+				clientID := r.PathValue("clientID")
+				if clientID == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("clientID is required"),
+					}
+				}
+
+				// Supprimer toutes les informations stockées pour ce client
+				success := WSClearStoredInformation(clientID)
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"clientID": clientID,
+					"cleared":  success,
+				})
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/hasStoredInformation/{clientID}/{key}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer le clientID et la clé depuis l'URL
+				clientID := r.PathValue("clientID")
+				key := r.PathValue("key")
+				if clientID == "" || key == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("clientID and key are required"),
+					}
+				}
+
+				// Vérifier si l'information existe
+				exists := WSHasStoredInformation(clientID, key)
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"clientID": clientID,
+					"key":      key,
+					"exists":   exists,
+				})
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/listStoredInformationKeys/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer le clientID depuis l'URL
+				clientID := r.PathValue("clientID")
+				if clientID == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("clientID is required"),
+					}
+				}
+
+				// Lister toutes les clés d'informations pour ce client
+				keys := WSListStoredInformationKeys(clientID)
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"clientID": clientID,
+					"keys":     keys,
+				})
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/getAllStoredInformation/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{
+						HTTPStatus: http.StatusMethodNotAllowed,
+						Err:        fmt.Errorf("method not allowed"),
+					}
+				}
+
+				// Récupérer le clientID depuis l'URL
+				clientID := r.PathValue("clientID")
+				if clientID == "" {
+					return caddy.APIError{
+						HTTPStatus: http.StatusBadRequest,
+						Err:        fmt.Errorf("clientID is required"),
+					}
+				}
+
+				// Récupérer toutes les informations stockées pour ce client
+				information := WSGetAllStoredInformation(clientID)
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{
+					"clientID":    clientID,
+					"information": information,
+				})
+			}),
+		},
 	}
 }
 
@@ -372,6 +598,9 @@ func (h *MyHandler) OnClose(socket *gws.Conn, err error) {
 		// Nettoyer les tags de cette connexion
 		WSClearTagsClient(connectionID)
 
+		// Nettoyer les informations stockées de cette connexion
+		WSClearStoredInformation(connectionID)
+
 		w.events <- Event{Type: EventClose, Connection: connectionID, RemoteAddr: socket.RemoteAddr().String(), Payload: err}
 		return
 	}
@@ -386,6 +615,10 @@ var frankenphpWSMutex sync.Mutex // Protège les appels à frankenphp_ws_getClie
 // Système de tags pour les connexions WebSocket
 var connTags = make(map[string]map[string]bool) // connectionID -> map[tag]bool
 var connTagsMutex sync.RWMutex                  // Protège les accès concurrents à connTags
+
+// Système de stockage d'informations pour les connexions WebSocket
+var storedInformation = make(map[string]map[string]string) // connectionID -> map[key]value
+var storedInfoMutex sync.RWMutex                           // Protège les accès concurrents à storedInformation
 
 func newConnID() string {
 	b := make([]byte, 16)
@@ -809,6 +1042,99 @@ func WSSendToTag(tag string, data []byte) int {
 	}
 
 	return sentCount
+}
+
+// ===== FONCTIONS DE STOCKAGE D'INFORMATIONS =====
+
+// SetStoredInformation stocke une information pour une connexion
+func WSSetStoredInformation(connectionID, key, value string) bool {
+	storedInfoMutex.Lock()
+	defer storedInfoMutex.Unlock()
+
+	if storedInformation[connectionID] == nil {
+		storedInformation[connectionID] = make(map[string]string)
+	}
+	storedInformation[connectionID][key] = value
+	return true
+}
+
+// GetStoredInformation récupère une information stockée pour une connexion
+func WSGetStoredInformation(connectionID, key string) (string, bool) {
+	storedInfoMutex.RLock()
+	defer storedInfoMutex.RUnlock()
+
+	if storedInformation[connectionID] != nil {
+		value, exists := storedInformation[connectionID][key]
+		return value, exists
+	}
+	return "", false
+}
+
+// DeleteStoredInformation supprime une information spécifique pour une connexion
+func WSDeleteStoredInformation(connectionID, key string) bool {
+	storedInfoMutex.Lock()
+	defer storedInfoMutex.Unlock()
+
+	if storedInformation[connectionID] != nil {
+		delete(storedInformation[connectionID], key)
+		// Si plus d'informations, supprimer l'entrée
+		if len(storedInformation[connectionID]) == 0 {
+			delete(storedInformation, connectionID)
+		}
+		return true
+	}
+	return false
+}
+
+// ClearStoredInformation supprime toutes les informations pour une connexion
+func WSClearStoredInformation(connectionID string) bool {
+	storedInfoMutex.Lock()
+	defer storedInfoMutex.Unlock()
+
+	delete(storedInformation, connectionID)
+	return true
+}
+
+// HasStoredInformation vérifie si une information existe pour une connexion
+func WSHasStoredInformation(connectionID, key string) bool {
+	storedInfoMutex.RLock()
+	defer storedInfoMutex.RUnlock()
+
+	if storedInformation[connectionID] != nil {
+		_, exists := storedInformation[connectionID][key]
+		return exists
+	}
+	return false
+}
+
+// ListStoredInformationKeys liste toutes les clés d'informations pour une connexion
+func WSListStoredInformationKeys(connectionID string) []string {
+	storedInfoMutex.RLock()
+	defer storedInfoMutex.RUnlock()
+
+	var keys []string
+	if storedInformation[connectionID] != nil {
+		for key := range storedInformation[connectionID] {
+			keys = append(keys, key)
+		}
+	}
+	return keys
+}
+
+// GetAllStoredInformation récupère toutes les informations pour une connexion
+func WSGetAllStoredInformation(connectionID string) map[string]string {
+	storedInfoMutex.RLock()
+	defer storedInfoMutex.RUnlock()
+
+	if storedInformation[connectionID] != nil {
+		// Créer une copie pour éviter les problèmes de concurrence
+		result := make(map[string]string)
+		for key, value := range storedInformation[connectionID] {
+			result[key] = value
+		}
+		return result
+	}
+	return make(map[string]string)
 }
 
 // Interface guards

@@ -444,3 +444,290 @@ func frankenphp_ws_sendToTag(tag *C.char, data *C.char, dataLen C.int) {
 	sentCount := WSSendToTag(tagStr, payload)
 	caddy.Log().Info("WS message sent to tag successfully", zap.String("tag", tagStr), zap.Int("sentCount", sentCount))
 }
+
+//export frankenphp_ws_setStoredInformation
+func frankenphp_ws_setStoredInformation(connectionID *C.char, key *C.char, value *C.char) {
+	id := C.GoString(connectionID)
+	keyStr := C.GoString(key)
+	valueStr := C.GoString(value)
+
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS setStoredInformation called", zap.String("sapi", sapi), zap.String("id", id), zap.String("key", keyStr))
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to set stored information")
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/setStoredInformation/%s/%s", id, keyStr)
+		adminRequest, err := http.NewRequest("POST", url, bytes.NewReader([]byte(valueStr)))
+		if err != nil {
+			caddy.Log().Error("Error creating admin set stored information request", zap.Error(err))
+			return
+		}
+		adminRequest.Header.Set("Content-Type", "text/plain")
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin set stored information request", zap.Error(err))
+			return
+		}
+		defer adminResponse.Body.Close()
+
+		caddy.Log().Info("Admin set stored information response", zap.Int("status", adminResponse.StatusCode))
+		return
+	}
+
+	// Mode Caddy/server : utilisation directe
+	WSSetStoredInformation(id, keyStr, valueStr)
+	caddy.Log().Info("WS stored information set successfully", zap.String("id", id), zap.String("key", keyStr))
+}
+
+//export frankenphp_ws_getStoredInformation
+func frankenphp_ws_getStoredInformation(connectionID *C.char, key *C.char) *C.char {
+	id := C.GoString(connectionID)
+	keyStr := C.GoString(key)
+
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS getStoredInformation called", zap.String("sapi", sapi), zap.String("id", id), zap.String("key", keyStr))
+
+	var value string
+	var exists bool
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to get stored information")
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/getStoredInformation/%s/%s", id, keyStr)
+		adminRequest, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin get stored information request", zap.Error(err))
+			return C.CString("")
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin get stored information request", zap.Error(err))
+			return C.CString("")
+		}
+		defer adminResponse.Body.Close()
+
+		body, err := io.ReadAll(adminResponse.Body)
+		if err != nil {
+			caddy.Log().Error("Error reading admin response", zap.Error(err))
+			return C.CString("")
+		}
+
+		var response struct {
+			ClientID string `json:"clientID"`
+			Key      string `json:"key"`
+			Value    string `json:"value"`
+			Exists   bool   `json:"exists"`
+		}
+		err = json.Unmarshal(body, &response)
+		if err != nil {
+			caddy.Log().Error("Error unmarshalling admin response", zap.Error(err))
+			return C.CString("")
+		}
+
+		value = response.Value
+		exists = response.Exists
+	} else {
+		// Mode Caddy/server : utilisation directe
+		value, exists = WSGetStoredInformation(id, keyStr)
+	}
+
+	if !exists {
+		return C.CString("")
+	}
+
+	return C.CString(value)
+}
+
+//export frankenphp_ws_deleteStoredInformation
+func frankenphp_ws_deleteStoredInformation(connectionID *C.char, key *C.char) {
+	id := C.GoString(connectionID)
+	keyStr := C.GoString(key)
+
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS deleteStoredInformation called", zap.String("sapi", sapi), zap.String("id", id), zap.String("key", keyStr))
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to delete stored information")
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/deleteStoredInformation/%s/%s", id, keyStr)
+		adminRequest, err := http.NewRequest("DELETE", url, nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin delete stored information request", zap.Error(err))
+			return
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin delete stored information request", zap.Error(err))
+			return
+		}
+		defer adminResponse.Body.Close()
+
+		caddy.Log().Info("Admin delete stored information response", zap.Int("status", adminResponse.StatusCode))
+		return
+	}
+
+	// Mode Caddy/server : utilisation directe
+	WSDeleteStoredInformation(id, keyStr)
+	caddy.Log().Info("WS stored information deleted successfully", zap.String("id", id), zap.String("key", keyStr))
+}
+
+//export frankenphp_ws_clearStoredInformation
+func frankenphp_ws_clearStoredInformation(connectionID *C.char) {
+	id := C.GoString(connectionID)
+
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS clearStoredInformation called", zap.String("sapi", sapi), zap.String("id", id))
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to clear stored information")
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/clearStoredInformation/%s", id)
+		adminRequest, err := http.NewRequest("DELETE", url, nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin clear stored information request", zap.Error(err))
+			return
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin clear stored information request", zap.Error(err))
+			return
+		}
+		defer adminResponse.Body.Close()
+
+		caddy.Log().Info("Admin clear stored information response", zap.Int("status", adminResponse.StatusCode))
+		return
+	}
+
+	// Mode Caddy/server : utilisation directe
+	WSClearStoredInformation(id)
+	caddy.Log().Info("WS stored information cleared successfully", zap.String("id", id))
+}
+
+//export frankenphp_ws_hasStoredInformation
+func frankenphp_ws_hasStoredInformation(connectionID *C.char, key *C.char) C.int {
+	id := C.GoString(connectionID)
+	keyStr := C.GoString(key)
+
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS hasStoredInformation called", zap.String("sapi", sapi), zap.String("id", id), zap.String("key", keyStr))
+
+	var exists bool
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to check stored information")
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/hasStoredInformation/%s/%s", id, keyStr)
+		adminRequest, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin has stored information request", zap.Error(err))
+			return 0
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin has stored information request", zap.Error(err))
+			return 0
+		}
+		defer adminResponse.Body.Close()
+
+		body, err := io.ReadAll(adminResponse.Body)
+		if err != nil {
+			caddy.Log().Error("Error reading admin response", zap.Error(err))
+			return 0
+		}
+
+		var response struct {
+			ClientID string `json:"clientID"`
+			Key      string `json:"key"`
+			Exists   bool   `json:"exists"`
+		}
+		err = json.Unmarshal(body, &response)
+		if err != nil {
+			caddy.Log().Error("Error unmarshalling admin response", zap.Error(err))
+			return 0
+		}
+
+		exists = response.Exists
+	} else {
+		// Mode Caddy/server : utilisation directe
+		exists = WSHasStoredInformation(id, keyStr)
+	}
+
+	if exists {
+		return 1
+	}
+	return 0
+}
+
+//export frankenphp_ws_listStoredInformationKeys
+func frankenphp_ws_listStoredInformationKeys(array unsafe.Pointer, connectionID *C.char) {
+	id := C.GoString(connectionID)
+
+	// Protéger contre les appels concurrents
+	frankenphpWSMutex.Lock()
+	defer frankenphpWSMutex.Unlock()
+
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS listStoredInformationKeys called", zap.String("sapi", sapi), zap.String("id", id))
+
+	var keys []string
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to list stored information keys")
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/listStoredInformationKeys/%s", id)
+		adminRequest, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin list stored information keys request", zap.Error(err))
+			return
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin list stored information keys request", zap.Error(err))
+			return
+		}
+		defer adminResponse.Body.Close()
+
+		body, err := io.ReadAll(adminResponse.Body)
+		if err != nil {
+			caddy.Log().Error("Error reading admin response", zap.Error(err))
+			return
+		}
+
+		var response struct {
+			ClientID string   `json:"clientID"`
+			Keys     []string `json:"keys"`
+		}
+		err = json.Unmarshal(body, &response)
+		if err != nil {
+			caddy.Log().Error("Error unmarshalling admin response", zap.Error(err))
+			return
+		}
+
+		keys = response.Keys
+	} else {
+		// Mode Caddy/server : utilisation directe
+		keys = WSListStoredInformationKeys(id)
+	}
+
+	// Ajouter les clés au tableau PHP
+	for _, key := range keys {
+		cstr := C.CString(key)
+		C.frankenphp_ws_addClient((*C.zval)(array), cstr)
+		C.free(unsafe.Pointer(cstr))
+	}
+
+	caddy.Log().Info("WS stored information keys list", zap.String("id", id), zap.Int("count", len(keys)), zap.Strings("keys", keys))
+}

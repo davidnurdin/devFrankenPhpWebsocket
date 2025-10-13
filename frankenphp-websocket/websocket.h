@@ -24,4 +24,12 @@ void frankenphp_ws_getTags(void* array);
 void frankenphp_ws_getClientsByTag(void* array, char* tag);
 void frankenphp_ws_sendToTag(char* tag, char* data, int data_len);
 
+// Stored information management functions
+void frankenphp_ws_setStoredInformation(char* connectionId, char* key, char* value);
+char* frankenphp_ws_getStoredInformation(char* connectionId, char* key);
+void frankenphp_ws_deleteStoredInformation(char* connectionId, char* key);
+void frankenphp_ws_clearStoredInformation(char* connectionId);
+int frankenphp_ws_hasStoredInformation(char* connectionId, char* key);
+void frankenphp_ws_listStoredInformationKeys(void* array, char* connectionId);
+
 #endif

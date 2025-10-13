@@ -115,6 +115,101 @@ PHP_FUNCTION(frankenphp_ws_sendToTag)
     frankenphp_ws_sendToTag(tag, data, (int)data_len);
 }
 
+PHP_FUNCTION(frankenphp_ws_setStoredInformation)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+    char *key = NULL;
+    size_t key_len = 0;
+    char *value = NULL;
+    size_t value_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(3, 3)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+        Z_PARAM_STRING(key, key_len)
+        Z_PARAM_STRING(value, value_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    frankenphp_ws_setStoredInformation(connectionId, key, value);
+}
+
+PHP_FUNCTION(frankenphp_ws_getStoredInformation)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+    char *key = NULL;
+    size_t key_len = 0;
+    char *result = NULL;
+
+    ZEND_PARSE_PARAMETERS_START(2, 2)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+        Z_PARAM_STRING(key, key_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    result = frankenphp_ws_getStoredInformation(connectionId, key);
+    if (result != NULL) {
+        RETURN_STRING(result);
+    } else {
+        RETURN_EMPTY_STRING();
+    }
+}
+
+PHP_FUNCTION(frankenphp_ws_deleteStoredInformation)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+    char *key = NULL;
+    size_t key_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(2, 2)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+        Z_PARAM_STRING(key, key_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    frankenphp_ws_deleteStoredInformation(connectionId, key);
+}
+
+PHP_FUNCTION(frankenphp_ws_clearStoredInformation)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    frankenphp_ws_clearStoredInformation(connectionId);
+}
+
+PHP_FUNCTION(frankenphp_ws_hasStoredInformation)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+    char *key = NULL;
+    size_t key_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(2, 2)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+        Z_PARAM_STRING(key, key_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_BOOL(frankenphp_ws_hasStoredInformation(connectionId, key) == 1);
+}
+
+PHP_FUNCTION(frankenphp_ws_listStoredInformationKeys)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    array_init(return_value);
+    // Go will iterate keys and call back frankenphp_ws_addClient for each
+    frankenphp_ws_listStoredInformationKeys((void*)return_value, connectionId);
+}
+
 
 zend_module_entry ext_module_entry = {
     STANDARD_MODULE_HEADER,

@@ -17,3 +17,15 @@ function frankenphp_ws_getTags(): array {}
 function frankenphp_ws_getClientsByTag(string $tag): array {}
 
 function frankenphp_ws_sendToTag(string $tag, string $data): void {}
+
+function frankenphp_ws_setStoredInformation(string $connectionId, string $key, string $value): void {}
+
+function frankenphp_ws_getStoredInformation(string $connectionId, string $key): string {}
+
+function frankenphp_ws_deleteStoredInformation(string $connectionId, string $key): void {}
+
+function frankenphp_ws_clearStoredInformation(string $connectionId): void {}
+
+function frankenphp_ws_hasStoredInformation(string $connectionId, string $key): bool {}
+
+function frankenphp_ws_listStoredInformationKeys(string $connectionId): array {}
