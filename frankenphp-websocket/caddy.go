@@ -856,7 +856,27 @@ func (h *MyHandler) OnOpen(socket *gws.Conn) {
 func (h *MyHandler) OnClose(socket *gws.Conn, err error) {
 	println("Connexion fermée")
 	// Publie un événement de fermeture (pas de réponse attendue)
+
+	if id, ok := connIDs.Load(socket); ok {
+
+		connectionID := id.(string)
+		connRoutesMutex.RLock()
+		route := connRoutes[connectionID]
+		connRoutesMutex.RUnlock()
+
+		if route == "" {
+			route = "/unknown"
+		}
+
+		beforeCloseDone := make(chan any)
+		// Nettoyer les tags de cette connexion
+		WSClearTagsClient(connectionID)
+		w.events <- Event{Type: EventBeforeClose, Connection: connectionID, RemoteAddr: socket.RemoteAddr().String(), Route: route, Payload: err, ResponseCh: beforeCloseDone}
+		<-beforeCloseDone
+	}
+
 	connIDsMutex.Lock()
+
 	if id, ok := connIDs.Load(socket); ok {
 		connectionID := id.(string)
 
@@ -865,7 +885,10 @@ func (h *MyHandler) OnClose(socket *gws.Conn, err error) {
 		route := connRoutes[connectionID]
 		connRoutesMutex.RUnlock()
 
-		w.events <- Event{Type: EventBeforeClose, Connection: connectionID, RemoteAddr: socket.RemoteAddr().String(), Route: route, Payload: err}
+		// Assurer l'ordre: attendre la fin du beforeClose avant de continuer
+		//beforeCloseDone := make(chan any)
+		//w.events <- Event{Type: EventBeforeClose, Connection: connectionID, RemoteAddr: socket.RemoteAddr().String(), Route: route, Payload: err, ResponseCh: beforeCloseDone}
+		//<-beforeCloseDone
 
 		connIDs.Delete(socket)
 		connIDsMutex.Unlock()
@@ -885,11 +908,14 @@ func (h *MyHandler) OnClose(socket *gws.Conn, err error) {
 			route = "/unknown"
 		}
 
-		w.events <- Event{Type: EventClose, Connection: connectionID, RemoteAddr: socket.RemoteAddr().String(), Route: route, Payload: err}
+		w.events <- Event{Type: EventClose, Connection: id.(string), RemoteAddr: socket.RemoteAddr().String(), Route: route, Payload: err}
 		return
 	}
 	connIDsMutex.Unlock()
-	w.events <- Event{Type: EventBeforeClose, Connection: "", RemoteAddr: socket.RemoteAddr().String(), Route: "/unknown", Payload: err}
+	// Même garantie d'ordre lorsqu'on ne retrouve pas l'ID
+	//beforeCloseDone := make(chan any)
+	//w.events <- Event{Type: EventBeforeClose, Connection: "", RemoteAddr: socket.RemoteAddr().String(), Route: "/unknown", Payload: err, ResponseCh: beforeCloseDone}
+	//<-beforeCloseDone
 	w.events <- Event{Type: EventClose, Connection: "", RemoteAddr: socket.RemoteAddr().String(), Route: "/unknown", Payload: err}
 }
 
