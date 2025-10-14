@@ -889,6 +889,7 @@ func (h *MyHandler) OnClose(socket *gws.Conn, err error) {
 		return
 	}
 	connIDsMutex.Unlock()
+	w.events <- Event{Type: EventBeforeClose, Connection: "", RemoteAddr: socket.RemoteAddr().String(), Route: "/unknown", Payload: err}
 	w.events <- Event{Type: EventClose, Connection: "", RemoteAddr: socket.RemoteAddr().String(), Route: "/unknown", Payload: err}
 }
 
