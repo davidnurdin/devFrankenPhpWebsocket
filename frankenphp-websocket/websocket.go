@@ -36,9 +36,10 @@ func getCurrentSAPI() string {
 type EventType string
 
 const (
-	EventOpen    EventType = "open"
-	EventMessage EventType = "message"
-	EventClose   EventType = "close"
+	EventOpen        EventType = "open"
+	EventMessage     EventType = "message"
+	EventClose       EventType = "close"
+	EventBeforeClose EventType = "beforeClose"
 )
 
 // Event unifie les événements WebSocket (open/message/close) envoyés vers PHP.

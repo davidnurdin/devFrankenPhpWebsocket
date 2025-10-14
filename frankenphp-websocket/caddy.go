@@ -859,13 +859,16 @@ func (h *MyHandler) OnClose(socket *gws.Conn, err error) {
 	connIDsMutex.Lock()
 	if id, ok := connIDs.Load(socket); ok {
 		connectionID := id.(string)
-		connIDs.Delete(socket)
-		connIDsMutex.Unlock()
 
 		// Récupérer la route avant de nettoyer
 		connRoutesMutex.RLock()
 		route := connRoutes[connectionID]
 		connRoutesMutex.RUnlock()
+
+		w.events <- Event{Type: EventBeforeClose, Connection: connectionID, RemoteAddr: socket.RemoteAddr().String(), Route: route, Payload: err}
+
+		connIDs.Delete(socket)
+		connIDsMutex.Unlock()
 
 		// Nettoyer les tags de cette connexion
 		WSClearTagsClient(connectionID)
