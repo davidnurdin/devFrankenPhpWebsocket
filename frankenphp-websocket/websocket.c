@@ -426,6 +426,42 @@ PHP_FUNCTION(frankenphp_ws_listRoutes)
     frankenphp_ws_listRoutes((void*)return_value);
 }
 
+PHP_FUNCTION(frankenphp_ws_activateGhost)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_BOOL(frankenphp_ws_activateGhost(connectionId) == 1);
+}
+
+PHP_FUNCTION(frankenphp_ws_releaseGhost)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_BOOL(frankenphp_ws_releaseGhost(connectionId) == 1);
+}
+
+PHP_FUNCTION(frankenphp_ws_isGhost)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_BOOL(frankenphp_ws_isGhost(connectionId) == 1);
+}
+
 PHP_FUNCTION(frankenphp_ws_renameConnection)
 {
     char *currentId = NULL;

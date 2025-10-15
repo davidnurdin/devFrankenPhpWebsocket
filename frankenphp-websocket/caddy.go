@@ -1195,6 +1195,75 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				})
 			}),
 		},
+		// ===== ENDPOINTS POUR LA GESTION DES CONNEXIONS FANTÔMES =====
+		{
+			Pattern: "/frankenphp_ws/activateGhost/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodPost {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				clientID := r.PathValue("clientID")
+				if clientID == "" {
+					return caddy.APIError{HTTPStatus: http.StatusBadRequest, Err: fmt.Errorf("clientID is required")}
+				}
+
+				success := WSActivateGhost(clientID)
+
+				response := map[string]any{
+					"clientID": clientID,
+					"success":  success,
+					"action":   "activateGhost",
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(response)
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/releaseGhost/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodPost {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				clientID := r.PathValue("clientID")
+				if clientID == "" {
+					return caddy.APIError{HTTPStatus: http.StatusBadRequest, Err: fmt.Errorf("clientID is required")}
+				}
+
+				success := WSReleaseGhost(clientID)
+
+				response := map[string]any{
+					"clientID": clientID,
+					"success":  success,
+					"action":   "releaseGhost",
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(response)
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/isGhost/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				clientID := r.PathValue("clientID")
+				if clientID == "" {
+					return caddy.APIError{HTTPStatus: http.StatusBadRequest, Err: fmt.Errorf("clientID is required")}
+				}
+
+				isGhost := WSIsGhost(clientID)
+
+				response := map[string]any{
+					"clientID": clientID,
+					"isGhost":  isGhost,
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(response)
+			}),
+		},
 	}
 }
 
@@ -1366,8 +1435,33 @@ func (h *MyHandler) OnClose(socket *gws.Conn, err error) {
 	// Publie un événement de fermeture (pas de réponse attendue)
 
 	if id, ok := connIDs.Load(socket); ok {
-
 		connectionID := id.(string)
+
+		// Vérifier si c'est une connexion fantôme
+		ghostConnectionsMutex.RLock()
+		isGhost := ghostConnections[connectionID]
+		ghostConnectionsMutex.RUnlock()
+
+		// Si c'est une connexion fantôme, déclencher l'événement ghostConnectionClose et s'arrêter
+		if isGhost {
+			caddy.Log().Info("WS OnClose: ghost connection detected, triggering ghostConnectionClose event", zap.String("connectionID", connectionID))
+
+			connRoutesMutex.RLock()
+			route := connRoutes[connectionID]
+			connRoutesMutex.RUnlock()
+
+			if route == "" {
+				route = "/unknown"
+			}
+
+			// Déclencher l'événement ghostConnectionClose
+			ghostCloseDone := make(chan any)
+			w.events <- Event{Type: EventGhostConnectionClose, Connection: connectionID, RemoteAddr: socket.RemoteAddr().String(), Route: route, Payload: err, ResponseCh: ghostCloseDone}
+			<-ghostCloseDone
+
+			return
+		}
+
 		connRoutesMutex.RLock()
 		route := connRoutes[connectionID]
 		connRoutesMutex.RUnlock()
@@ -1462,6 +1556,10 @@ var connRoutesMutex sync.RWMutex         // Protège les accès concurrents à c
 // Stockage temporaire des routes en cours de connexion (par adresse IP)
 var tempRoutes = make(map[string]string) // remoteAddr -> route
 var tempRoutesMutex sync.RWMutex         // Protège les accès concurrents à tempRoutes
+
+// Système de gestion des connexions fantômes
+var ghostConnections = make(map[string]bool) // connectionID -> isGhost
+var ghostConnectionsMutex sync.RWMutex       // Protège les accès concurrents à ghostConnections
 
 // ===== GESTION DES PING/PONG =====
 var clientPingTimes = make(map[string]time.Duration)     // connectionID -> ping time
@@ -2951,6 +3049,140 @@ func WSGetClientsByTagExpression(expression string) []string {
 	}
 
 	return matchingClients
+}
+
+// ===== GESTION DES CONNEXIONS FANTÔMES =====
+
+// WSActivateGhost marque une connexion comme fantôme
+func WSActivateGhost(connectionID string) bool {
+	ghostConnectionsMutex.Lock()
+	defer ghostConnectionsMutex.Unlock()
+
+	// Vérifier que la connexion existe
+	connIDsMutex.RLock()
+	var exists bool
+	connIDs.Range(func(_, v any) bool {
+		if v.(string) == connectionID {
+			exists = true
+			return false
+		}
+		return true
+	})
+	connIDsMutex.RUnlock()
+
+	if !exists {
+		caddy.Log().Warn("WS activateGhost: connection not found", zap.String("connectionID", connectionID))
+		return false
+	}
+
+	ghostConnections[connectionID] = true
+	caddy.Log().Info("WS ghost connection activated", zap.String("connectionID", connectionID))
+	return true
+}
+
+// WSReleaseGhost libère une connexion fantôme et déclenche les événements de fermeture
+func WSReleaseGhost(connectionID string) bool {
+	ghostConnectionsMutex.Lock()
+	defer ghostConnectionsMutex.Unlock()
+
+	// Vérifier que la connexion est bien fantôme
+	if !ghostConnections[connectionID] {
+		caddy.Log().Warn("WS releaseGhost: connection is not a ghost", zap.String("connectionID", connectionID))
+		return false
+	}
+
+	// Retirer le statut fantôme
+	delete(ghostConnections, connectionID)
+
+	// Trouver la connexion WebSocket
+	connIDsMutex.RLock()
+	var target *gws.Conn
+	connIDs.Range(func(k, v any) bool {
+		if v.(string) == connectionID {
+			target = k.(*gws.Conn)
+			return false
+		}
+		return true
+	})
+	connIDsMutex.RUnlock()
+
+	if target == nil {
+		caddy.Log().Warn("WS releaseGhost: connection not found", zap.String("connectionID", connectionID))
+		return false
+	}
+
+	// Récupérer la route
+	connRoutesMutex.RLock()
+	route := connRoutes[connectionID]
+	connRoutesMutex.RUnlock()
+	if route == "" {
+		route = "/unknown"
+	}
+
+	// Déclencher l'événement GhostConnectionClose
+	ghostCloseDone := make(chan any)
+	w.events <- Event{
+		Type:       EventGhostConnectionClose,
+		Connection: connectionID,
+		RemoteAddr: target.RemoteAddr().String(),
+		Route:      route,
+		Payload:    "ghost_released",
+		ResponseCh: ghostCloseDone,
+	}
+	<-ghostCloseDone
+
+	// Maintenant déclencher les événements de fermeture normaux
+	beforeCloseDone := make(chan any)
+	w.events <- Event{
+		Type:       EventBeforeClose,
+		Connection: connectionID,
+		RemoteAddr: target.RemoteAddr().String(),
+		Route:      route,
+		Payload:    "ghost_released",
+		ResponseCh: beforeCloseDone,
+	}
+	<-beforeCloseDone
+
+	// Nettoyer la connexion
+	connIDsMutex.Lock()
+	connIDs.Delete(target)
+	connIDsMutex.Unlock()
+
+	// Nettoyer les données
+	WSClearTagsClient(connectionID)
+	WSClearStoredInformation(connectionID)
+
+	// Nettoyer les données ping/pong
+	pingTimesMutex.Lock()
+	delete(clientPingTimes, connectionID)
+	delete(clientPingTimestamps, connectionID)
+	delete(clientPingEnabled, connectionID)
+	pingTimesMutex.Unlock()
+
+	// Nettoyer la route
+	connRoutesMutex.Lock()
+	delete(connRoutes, connectionID)
+	connRoutesMutex.Unlock()
+
+	// Déclencher l'événement Close
+	w.events <- Event{
+		Type:       EventClose,
+		Connection: connectionID,
+		RemoteAddr: target.RemoteAddr().String(),
+		Route:      route,
+		Payload:    "ghost_released",
+	}
+
+	caddy.Log().Info("WS ghost connection released and closed", zap.String("connectionID", connectionID))
+	return true
+}
+
+// WSIsGhost vérifie si une connexion est fantôme
+func WSIsGhost(connectionID string) bool {
+	ghostConnectionsMutex.RLock()
+	defer ghostConnectionsMutex.RUnlock()
+
+	return ghostConnections[connectionID]
 }
 
 // Interface guards

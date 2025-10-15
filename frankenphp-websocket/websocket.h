@@ -42,4 +42,9 @@ void frankenphp_ws_getClientsByTagExpression(void* array, char* expression);
 // Connection management functions
 int frankenphp_ws_renameConnection(char* currentId, char* newId);
 
+// Ghost connection management functions
+int frankenphp_ws_activateGhost(char* connectionId);
+int frankenphp_ws_releaseGhost(char* connectionId);
+int frankenphp_ws_isGhost(char* connectionId);
+
 #endif

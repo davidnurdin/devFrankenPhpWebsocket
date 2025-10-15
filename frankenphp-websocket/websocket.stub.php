@@ -58,6 +58,11 @@ function frankenphp_ws_getClientsByTagExpression(string $expression): array {}
 
 function frankenphp_ws_listRoutes(): array {}
 
+// ===== Ghost connection management =====
+function frankenphp_ws_activateGhost(string $connectionId): bool {}
+function frankenphp_ws_releaseGhost(string $connectionId): bool {}
+function frankenphp_ws_isGhost(string $connectionId): bool {}
+
 function frankenphp_ws_renameConnection(string $currentId, string $newId): bool {}
 
 // ===== Global information (in-memory, thread-safe, with expiration) =====

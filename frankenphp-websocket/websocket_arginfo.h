@@ -1,5 +1,5 @@
 /* This is a generated file, edit the .stub.php file instead.
- * Stub hash: 75296e7cee1f8fc46e3eb77cecfbeb61062b3cb7 */
+ * Stub hash: 6844f4155b800744229e5f2b3b1702e21d17cc91 */
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getClients, 0, 0, IS_ARRAY, 0)
 	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, route, IS_STRING, 1, "null")
@@ -116,6 +116,12 @@ ZEND_END_ARG_INFO()
 
 #define arginfo_frankenphp_ws_listRoutes arginfo_frankenphp_ws_getTags
 
+#define arginfo_frankenphp_ws_activateGhost arginfo_frankenphp_ws_killConnection
+
+#define arginfo_frankenphp_ws_releaseGhost arginfo_frankenphp_ws_killConnection
+
+#define arginfo_frankenphp_ws_isGhost arginfo_frankenphp_ws_killConnection
+
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_renameConnection, 0, 2, _IS_BOOL, 0)
 	ZEND_ARG_TYPE_INFO(0, currentId, IS_STRING, 0)
 	ZEND_ARG_TYPE_INFO(0, newId, IS_STRING, 0)
@@ -173,6 +179,9 @@ ZEND_FUNCTION(frankenphp_ws_listStoredInformationKeys);
 ZEND_FUNCTION(frankenphp_ws_sendToTagExpression);
 ZEND_FUNCTION(frankenphp_ws_getClientsByTagExpression);
 ZEND_FUNCTION(frankenphp_ws_listRoutes);
+ZEND_FUNCTION(frankenphp_ws_activateGhost);
+ZEND_FUNCTION(frankenphp_ws_releaseGhost);
+ZEND_FUNCTION(frankenphp_ws_isGhost);
 ZEND_FUNCTION(frankenphp_ws_renameConnection);
 ZEND_FUNCTION(frankenphp_ws_global_set);
 ZEND_FUNCTION(frankenphp_ws_global_get);
@@ -210,6 +219,9 @@ static const zend_function_entry ext_functions[] = {
 	ZEND_FE(frankenphp_ws_sendToTagExpression, arginfo_frankenphp_ws_sendToTagExpression)
 	ZEND_FE(frankenphp_ws_getClientsByTagExpression, arginfo_frankenphp_ws_getClientsByTagExpression)
 	ZEND_FE(frankenphp_ws_listRoutes, arginfo_frankenphp_ws_listRoutes)
+	ZEND_FE(frankenphp_ws_activateGhost, arginfo_frankenphp_ws_activateGhost)
+	ZEND_FE(frankenphp_ws_releaseGhost, arginfo_frankenphp_ws_releaseGhost)
+	ZEND_FE(frankenphp_ws_isGhost, arginfo_frankenphp_ws_isGhost)
 	ZEND_FE(frankenphp_ws_renameConnection, arginfo_frankenphp_ws_renameConnection)
 	ZEND_FE(frankenphp_ws_global_set, arginfo_frankenphp_ws_global_set)
 	ZEND_FE(frankenphp_ws_global_get, arginfo_frankenphp_ws_global_get)

@@ -39,10 +39,11 @@ func getCurrentSAPI() string {
 type EventType string
 
 const (
-	EventOpen        EventType = "open"
-	EventMessage     EventType = "message"
-	EventClose       EventType = "close"
-	EventBeforeClose EventType = "beforeClose"
+	EventOpen                 EventType = "open"
+	EventMessage              EventType = "message"
+	EventClose                EventType = "close"
+	EventBeforeClose          EventType = "beforeClose"
+	EventGhostConnectionClose EventType = "ghostConnectionClose"
 )
 
 // Event unifie les événements WebSocket (open/message/close) envoyés vers PHP.
@@ -1728,6 +1729,135 @@ func frankenphp_ws_listRoutes(array unsafe.Pointer) {
 	}
 
 	caddy.Log().Info("WS routes list", zap.Int("count", len(routes)), zap.Strings("routes", routes))
+}
+
+//export frankenphp_ws_activateGhost
+func frankenphp_ws_activateGhost(connectionID *C.char) C.int {
+	connectionIDStr := C.GoString(connectionID)
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS activateGhost called", zap.String("sapi", sapi), zap.String("connectionID", connectionIDStr))
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to activate ghost connection")
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/activateGhost/%s", connectionIDStr)
+		adminRequest, err := http.NewRequest("POST", url, nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin activate ghost request", zap.Error(err))
+			return C.int(0)
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin activate ghost request", zap.Error(err))
+			return C.int(0)
+		}
+		defer adminResponse.Body.Close()
+
+		if adminResponse.StatusCode == http.StatusOK {
+			caddy.Log().Info("Admin activate ghost response", zap.Int("status", adminResponse.StatusCode))
+			return C.int(1)
+		} else {
+			caddy.Log().Error("Admin activate ghost failed", zap.Int("status", adminResponse.StatusCode))
+			return C.int(0)
+		}
+	}
+
+	// Mode Caddy/server : utilisation directe
+	success := WSActivateGhost(connectionIDStr)
+	if success {
+		caddy.Log().Info("WS ghost connection activated successfully", zap.String("connectionID", connectionIDStr))
+		return C.int(1)
+	} else {
+		caddy.Log().Error("WS ghost connection activation failed", zap.String("connectionID", connectionIDStr))
+		return C.int(0)
+	}
+}
+
+//export frankenphp_ws_releaseGhost
+func frankenphp_ws_releaseGhost(connectionID *C.char) C.int {
+	connectionIDStr := C.GoString(connectionID)
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS releaseGhost called", zap.String("sapi", sapi), zap.String("connectionID", connectionIDStr))
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to release ghost connection")
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/releaseGhost/%s", connectionIDStr)
+		adminRequest, err := http.NewRequest("POST", url, nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin release ghost request", zap.Error(err))
+			return C.int(0)
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin release ghost request", zap.Error(err))
+			return C.int(0)
+		}
+		defer adminResponse.Body.Close()
+
+		if adminResponse.StatusCode == http.StatusOK {
+			caddy.Log().Info("Admin release ghost response", zap.Int("status", adminResponse.StatusCode))
+			return C.int(1)
+		} else {
+			caddy.Log().Error("Admin release ghost failed", zap.Int("status", adminResponse.StatusCode))
+			return C.int(0)
+		}
+	}
+
+	// Mode Caddy/server : utilisation directe
+	success := WSReleaseGhost(connectionIDStr)
+	if success {
+		caddy.Log().Info("WS ghost connection released successfully", zap.String("connectionID", connectionIDStr))
+		return C.int(1)
+	} else {
+		caddy.Log().Error("WS ghost connection release failed", zap.String("connectionID", connectionIDStr))
+		return C.int(0)
+	}
+}
+
+//export frankenphp_ws_isGhost
+func frankenphp_ws_isGhost(connectionID *C.char) C.int {
+	connectionIDStr := C.GoString(connectionID)
+	sapi := getCurrentSAPI()
+	caddy.Log().Info("WS isGhost called", zap.String("sapi", sapi), zap.String("connectionID", connectionIDStr))
+
+	if sapi == "cli" {
+		// Faire une requête admin vers le serveur Caddy
+		caddy.Log().Info("Making admin request to check ghost status")
+
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/isGhost/%s", connectionIDStr)
+		adminRequest, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin is ghost request", zap.Error(err))
+			return C.int(0)
+		}
+
+		adminResponse, err := http.DefaultClient.Do(adminRequest)
+		if err != nil {
+			caddy.Log().Error("Error making admin is ghost request", zap.Error(err))
+			return C.int(0)
+		}
+		defer adminResponse.Body.Close()
+
+		if adminResponse.StatusCode == http.StatusOK {
+			caddy.Log().Info("Admin is ghost response", zap.Int("status", adminResponse.StatusCode))
+			return C.int(1)
+		} else {
+			caddy.Log().Info("Admin is ghost response - not ghost", zap.Int("status", adminResponse.StatusCode))
+			return C.int(0)
+		}
+	}
+
+	// Mode Caddy/server : utilisation directe
+	isGhost := WSIsGhost(connectionIDStr)
+	if isGhost {
+		return C.int(1)
+	}
+	return C.int(0)
 }
 
 //export frankenphp_ws_renameConnection
