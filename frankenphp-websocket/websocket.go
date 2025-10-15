@@ -776,6 +776,52 @@ func frankenphp_ws_listStoredInformationKeys(array unsafe.Pointer, connectionID 
 	caddy.Log().Info("WS stored information keys list", zap.String("id", id), zap.Int("count", len(keys)), zap.Strings("keys", keys))
 }
 
+//export frankenphp_ws_killConnection
+func frankenphp_ws_killConnection(connectionID *C.char) C.int {
+	connectionIDStr := C.GoString(connectionID)
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// POST /frankenphp_ws/killConnection/{clientID}
+		urlStr := fmt.Sprintf("http://localhost:2019/frankenphp_ws/killConnection/%s", url.PathEscape(connectionIDStr))
+		req, err := http.NewRequest("POST", urlStr, nil)
+		if err != nil {
+			return 0
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return 0
+		}
+
+		var response struct {
+			ClientID string `json:"clientID"`
+			Success  bool   `json:"success"`
+			Error    string `json:"error,omitempty"`
+		}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return 0
+		}
+
+		if response.Success {
+			return 1
+		}
+		return 0
+	}
+
+	// Mode Caddy/server : utilisation directe
+	success := WSKillConnection(connectionIDStr)
+	if success {
+		return 1
+	}
+	return 0
+}
+
 //export frankenphp_ws_sendAll
 func frankenphp_ws_sendAll(data *C.char, dataLen C.int, route *C.char) C.int {
 	dataStr := C.GoStringN(data, dataLen)

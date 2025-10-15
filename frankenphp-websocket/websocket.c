@@ -76,6 +76,18 @@ PHP_FUNCTION(frankenphp_ws_sendAll)
     RETURN_LONG(frankenphp_ws_sendAll(data, (int)data_len, route));
 }
 
+PHP_FUNCTION(frankenphp_ws_killConnection)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_BOOL(frankenphp_ws_killConnection(connectionId) == 1);
+}
+
 PHP_FUNCTION(frankenphp_ws_tagClient)
 {
     char *connectionId = NULL;

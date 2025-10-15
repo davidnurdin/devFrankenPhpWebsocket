@@ -9,6 +9,7 @@ Extension WebSocket pour FrankenPHP avec support des tags, stockage d'informatio
 - **[API Global Information](GLOBAL_INFORMATION_API.md)** - Stockage global avec expiration
 - **[API Clients Count](CLIENTS_COUNT_API.md)** - Comptage des clients connectés
 - **[API Send All](SEND_ALL_API.md)** - Envoi massif de messages
+- **[API Kill Connection](KILL_CONNECTION_API.md)** - Fermeture forcée de connexions
 
 ## Fonctions principales
 
@@ -17,6 +18,7 @@ Extension WebSocket pour FrankenPHP avec support des tags, stockage d'informatio
 - `frankenphp_ws_getClientsCount(?string $route = null): int` - Nombre de clients
 - `frankenphp_ws_send(string $connectionId, string $data, ?string $route = null): void` - Envoi de message
 - `frankenphp_ws_sendAll(string $data, ?string $route = null): int` - Envoi massif
+- `frankenphp_ws_killConnection(string $connectionId): bool` - Fermeture forcée
 
 ### Système de tags
 - `frankenphp_ws_tagClient(string $connectionId, string $tag): void` - Ajouter un tag
@@ -46,6 +48,9 @@ $chatClients = frankenphp_ws_getClientsCount('/chat');
 // Envoi massif
 $sentCount = frankenphp_ws_sendAll("Message à tous les clients");
 $chatSentCount = frankenphp_ws_sendAll("Message au chat", "/chat");
+
+// Fermeture forcée
+$success = frankenphp_ws_killConnection("client_123");
 
 // Gestion des tags
 frankenphp_ws_tagClient($connectionId, 'premium');

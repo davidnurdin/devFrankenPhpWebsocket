@@ -672,6 +672,32 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				})
 			}),
 		},
+		// ===== ENDPOINTS POUR LA GESTION DES CONNEXIONS =====
+		{
+			Pattern: "/frankenphp_ws/killConnection/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodPost {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				clientID := r.PathValue("clientID")
+				if clientID == "" {
+					return caddy.APIError{HTTPStatus: http.StatusBadRequest, Err: fmt.Errorf("clientID is required")}
+				}
+
+				success := WSKillConnection(clientID)
+
+				response := map[string]any{
+					"clientID": clientID,
+					"success":  success,
+				}
+				if !success {
+					response["error"] = "Connection not found or already closed"
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(response)
+			}),
+		},
 		// ===== ENDPOINTS POUR L'ENVOI MASSIF =====
 		{
 			Pattern: "/frankenphp_ws/sendAll",
@@ -1769,6 +1795,35 @@ func WSHasStoredInformation(connectionID, key string) bool {
 		_, exists := storedInformation[connectionID][key]
 		return exists
 	}
+	return false
+}
+
+// ===== GESTION DES CONNEXIONS =====
+
+// WSKillConnection ferme immédiatement une connexion WebSocket spécifique
+func WSKillConnection(connectionID string) bool {
+	connIDsMutex.RLock()
+	var target *gws.Conn
+	connIDs.Range(func(k, v any) bool {
+		if v.(string) == connectionID {
+			target = k.(*gws.Conn)
+			return false
+		}
+		return true
+	})
+	connIDsMutex.RUnlock()
+
+	if target != nil {
+		// Fermer la connexion immédiatement via la connexion réseau sous-jacente
+		if err := target.NetConn().Close(); err != nil {
+			caddy.Log().Error("WS killConnection failed", zap.String("connectionID", connectionID), zap.Error(err))
+			return false
+		}
+		caddy.Log().Info("WS connection killed", zap.String("connectionID", connectionID))
+		return true
+	}
+
+	caddy.Log().Warn("WS connection not found for kill", zap.String("connectionID", connectionID))
 	return false
 }
 
