@@ -37,3 +37,14 @@ function frankenphp_ws_getClientsByTagExpression(string $expression): array {}
 function frankenphp_ws_listRoutes(): array {}
 
 function frankenphp_ws_renameConnection(string $currentId, string $newId): bool {}
+
+// ===== Global information (in-memory, thread-safe, with expiration) =====
+// expireSeconds: 0 for infinite; >0 means N seconds
+function frankenphp_ws_global_set(string $key, string $value, int $expireSeconds = 0): void {}
+function frankenphp_ws_global_get(string $key): string {}
+function frankenphp_ws_global_has(string $key): bool {}
+function frankenphp_ws_global_delete(string $key): bool {}
+
+// ===== Stored Information search =====
+// Retourne la liste d'IDs correspondant à key/op/value, filtrable par route
+function frankenphp_ws_searchStoredInformation(string $key, string $op, string $value, ?string $route = null): array {}

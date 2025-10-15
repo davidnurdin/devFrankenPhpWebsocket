@@ -387,6 +387,110 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				return nil
 			}),
 		},
+		// ===== ENDPOINTS POUR LES INFORMATIONS GLOBALES =====
+		{
+			Pattern: "/frankenphp_ws/global/set/{key}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodPost {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				key := r.PathValue("key")
+				if key == "" {
+					return caddy.APIError{HTTPStatus: http.StatusBadRequest, Err: fmt.Errorf("key is required")}
+				}
+				// expiration en secondes en query, 0 par défaut (= infini)
+				expSecondsStr := r.URL.Query().Get("exp")
+				var exp time.Time
+				if expSecondsStr != "" {
+					if sec, err := strconv.ParseInt(expSecondsStr, 10, 64); err == nil && sec > 0 {
+						exp = time.Now().Add(time.Duration(sec) * time.Second)
+					}
+				}
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					return caddy.APIError{HTTPStatus: http.StatusBadRequest, Err: fmt.Errorf("failed to read body: %v", err)}
+				}
+				value := string(body)
+				globalInfoMutex.Lock()
+				globalInformation[key] = globalEntry{value: value, expiresAt: exp}
+				globalInfoMutex.Unlock()
+				w.WriteHeader(http.StatusOK)
+				return nil
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/global/get/{key}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				key := r.PathValue("key")
+				if key == "" {
+					return caddy.APIError{HTTPStatus: http.StatusBadRequest, Err: fmt.Errorf("key is required")}
+				}
+				globalInfoMutex.RLock()
+				entry, ok := globalInformation[key]
+				globalInfoMutex.RUnlock()
+				if !ok {
+					w.WriteHeader(http.StatusNotFound)
+					return nil
+				}
+				if !entry.expiresAt.IsZero() && time.Now().After(entry.expiresAt) {
+					// Expiré -> supprimer et 404
+					globalInfoMutex.Lock()
+					delete(globalInformation, key)
+					globalInfoMutex.Unlock()
+					w.WriteHeader(http.StatusNotFound)
+					return nil
+				}
+				w.Header().Set("Content-Type", "text/plain")
+				_, _ = w.Write([]byte(entry.value))
+				return nil
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/global/has/{key}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				key := r.PathValue("key")
+				if key == "" {
+					return caddy.APIError{HTTPStatus: http.StatusBadRequest, Err: fmt.Errorf("key is required")}
+				}
+				globalInfoMutex.RLock()
+				entry, ok := globalInformation[key]
+				globalInfoMutex.RUnlock()
+				if ok && (entry.expiresAt.IsZero() || time.Now().Before(entry.expiresAt)) {
+					w.WriteHeader(http.StatusOK)
+					return nil
+				}
+				w.WriteHeader(http.StatusNotFound)
+				return nil
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/global/delete/{key}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodDelete {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				key := r.PathValue("key")
+				if key == "" {
+					return caddy.APIError{HTTPStatus: http.StatusBadRequest, Err: fmt.Errorf("key is required")}
+				}
+				globalInfoMutex.Lock()
+				_, existed := globalInformation[key]
+				delete(globalInformation, key)
+				globalInfoMutex.Unlock()
+				if existed {
+					w.WriteHeader(http.StatusOK)
+				} else {
+					w.WriteHeader(http.StatusNotFound)
+				}
+				return nil
+			}),
+		},
 		{
 			Pattern: "/frankenphp_ws/getStoredInformation/{clientID}/{key}",
 			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
@@ -569,6 +673,24 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 			}),
 		},
 		// ===== ENDPOINTS POUR LA LOGIQUE DE TAGS =====
+		{
+			Pattern: "/frankenphp_ws/searchStoredInformation",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				key := r.URL.Query().Get("key")
+				op := r.URL.Query().Get("op")
+				val := r.URL.Query().Get("value")
+				route := r.URL.Query().Get("route")
+				if key == "" || op == "" {
+					return caddy.APIError{HTTPStatus: http.StatusBadRequest, Err: fmt.Errorf("key and op are required")}
+				}
+				clients := WSSearchStoredInformation(key, op, val, route)
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{"clients": clients, "count": len(clients), "key": key, "op": op, "value": val, "route": route})
+			}),
+		},
 		{
 			Pattern: "/frankenphp_ws/sendToTagExpression/{expression}",
 			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
@@ -930,6 +1052,15 @@ var connTagsMutex sync.RWMutex                  // Protège les accès concurren
 // Système de stockage d'informations pour les connexions WebSocket
 var storedInformation = make(map[string]map[string]string) // connectionID -> map[key]value
 var storedInfoMutex sync.RWMutex                           // Protège les accès concurrents à storedInformation
+
+// Système global clé/valeur avec expiration
+type globalEntry struct {
+	value     string
+	expiresAt time.Time // zéro = pas d'expiration
+}
+
+var globalInformation = make(map[string]globalEntry)
+var globalInfoMutex sync.RWMutex
 
 // Système de stockage des routes pour les connexions WebSocket
 var connRoutes = make(map[string]string) // connectionID -> route
@@ -1580,6 +1711,66 @@ func WSHasStoredInformation(connectionID, key string) bool {
 		return exists
 	}
 	return false
+}
+
+// ===== RECHERCHE DANS LES INFORMATIONS STOCKÉES =====
+
+// WSSearchStoredInformation retourne la liste des connections dont la valeur associée à key
+// matche selon l'opérateur.
+// op: eq, neq, prefix, suffix, contains, ieq, iprefix, isuffix, icontains, regex
+func WSSearchStoredInformation(key, op, value, route string) []string {
+	matcher := func(s string) bool { return false }
+	switch op {
+	case "eq":
+		matcher = func(s string) bool { return s == value }
+	case "neq":
+		matcher = func(s string) bool { return s != value }
+	case "prefix":
+		matcher = func(s string) bool { return strings.HasPrefix(s, value) }
+	case "suffix":
+		matcher = func(s string) bool { return strings.HasSuffix(s, value) }
+	case "contains":
+		matcher = func(s string) bool { return strings.Contains(s, value) }
+	case "ieq":
+		lv := strings.ToLower(value)
+		matcher = func(s string) bool { return strings.ToLower(s) == lv }
+	case "iprefix":
+		lv := strings.ToLower(value)
+		matcher = func(s string) bool { return strings.HasPrefix(strings.ToLower(s), lv) }
+	case "isuffix":
+		lv := strings.ToLower(value)
+		matcher = func(s string) bool { return strings.HasSuffix(strings.ToLower(s), lv) }
+	case "icontains":
+		lv := strings.ToLower(value)
+		matcher = func(s string) bool { return strings.Contains(strings.ToLower(s), lv) }
+	case "regex":
+		re, err := regexp.Compile(value)
+		if err != nil {
+			return []string{}
+		}
+		matcher = func(s string) bool { return re.MatchString(s) }
+	default:
+		return []string{}
+	}
+
+	var ids []string
+	storedInfoMutex.RLock()
+	defer storedInfoMutex.RUnlock()
+
+	for connID, kv := range storedInformation {
+		if route != "" {
+			connRoutesMutex.RLock()
+			r := connRoutes[connID]
+			connRoutesMutex.RUnlock()
+			if r != route {
+				continue
+			}
+		}
+		if v, ok := kv[key]; ok && matcher(v) {
+			ids = append(ids, connID)
+		}
+	}
+	return ids
 }
 
 // ListStoredInformationKeys liste toutes les clés d'informations pour une connexion

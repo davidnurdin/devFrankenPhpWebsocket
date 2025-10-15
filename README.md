@@ -179,3 +179,14 @@ frankenphp_ws_sendToTagExpression('group_*&!banned', json_encode([
 ]));
 ```
 
+
+## Global Information API
+
+Voir la documentation détaillée dans `GLOBAL_INFORMATION_API.md` pour l'utilisation des fonctions PHP:
+
+- `frankenphp_ws_global_set(string $key, string $value, int $expireSeconds = 0): void`
+- `frankenphp_ws_global_get(string $key): string`
+- `frankenphp_ws_global_has(string $key): bool`
+- `frankenphp_ws_global_delete(string $key): bool`
+
+Ces fonctions permettent de stocker des informations globales en mémoire, avec expiration optionnelle, en toute sécurité concurrente, et utilisables en CLI comme en mode serveur.

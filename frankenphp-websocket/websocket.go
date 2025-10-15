@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
+	"time"
 	"unsafe"
 
 	"github.com/caddyserver/caddy/v2"
@@ -772,6 +774,214 @@ func frankenphp_ws_listStoredInformationKeys(array unsafe.Pointer, connectionID 
 	}
 
 	caddy.Log().Info("WS stored information keys list", zap.String("id", id), zap.Int("count", len(keys)), zap.Strings("keys", keys))
+}
+
+//export frankenphp_ws_searchStoredInformation
+func frankenphp_ws_searchStoredInformation(array unsafe.Pointer, key *C.char, op *C.char, value *C.char, route *C.char) {
+	// Protéger contre les appels concurrents (retour tableau)
+	frankenphpWSMutex.Lock()
+	defer frankenphpWSMutex.Unlock()
+
+	k := C.GoString(key)
+	o := C.GoString(op)
+	v := ""
+	if value != nil {
+		v = C.GoString(value)
+	}
+	r := ""
+	if route != nil {
+		r = C.GoString(route)
+	}
+
+	sapi := getCurrentSAPI()
+	if sapi == "cli" {
+		// GET /frankenphp_ws/searchStoredInformation?key=...&op=...&value=...&route=...
+		q := url.Values{}
+		q.Set("key", k)
+		q.Set("op", o)
+		if v != "" {
+			q.Set("value", v)
+		}
+		if r != "" {
+			q.Set("route", r)
+		}
+		requestURL := fmt.Sprintf("http://localhost:2019/frankenphp_ws/searchStoredInformation?%s", q.Encode())
+		req, err := http.NewRequest("GET", requestURL, nil)
+		if err != nil {
+			return
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return
+		}
+		var respObj struct {
+			Clients []string `json:"clients"`
+		}
+		if err := json.Unmarshal(body, &respObj); err != nil {
+			return
+		}
+		for _, id := range respObj.Clients {
+			cstr := C.CString(id)
+			C.frankenphp_ws_addClient((*C.zval)(array), cstr)
+			C.free(unsafe.Pointer(cstr))
+		}
+		return
+	}
+
+	ids := WSSearchStoredInformation(k, o, v, r)
+	for _, id := range ids {
+		cstr := C.CString(id)
+		C.frankenphp_ws_addClient((*C.zval)(array), cstr)
+		C.free(unsafe.Pointer(cstr))
+	}
+}
+
+// ===== Global key/value with expiration (CLI -> admin; Server -> direct) =====
+
+//export frankenphp_ws_global_set
+func frankenphp_ws_global_set(key *C.char, value *C.char, expireSeconds C.int) {
+	k := C.GoString(key)
+	v := C.GoString(value)
+	exp := int(expireSeconds)
+
+	sapi := getCurrentSAPI()
+	if sapi == "cli" {
+		// POST /frankenphp_ws/global/set/{key}?exp=N  body=value
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/global/set/%s", url.PathEscape(k))
+		if exp > 0 {
+			url = url + "?exp=" + strconv.Itoa(exp)
+		}
+		req, err := http.NewRequest("POST", url, bytes.NewReader([]byte(v)))
+		if err != nil {
+			caddy.Log().Error("Error creating admin global set request", zap.Error(err))
+			return
+		}
+		req.Header.Set("Content-Type", "text/plain")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			caddy.Log().Error("Error making admin global set request", zap.Error(err))
+			return
+		}
+		defer resp.Body.Close()
+		return
+	}
+
+	// Direct: update in-memory map
+	var expiresAt time.Time
+	if exp > 0 {
+		expiresAt = time.Now().Add(time.Duration(exp) * time.Second)
+	}
+	globalInfoMutex.Lock()
+	globalInformation[k] = globalEntry{value: v, expiresAt: expiresAt}
+	globalInfoMutex.Unlock()
+}
+
+//export frankenphp_ws_global_get
+func frankenphp_ws_global_get(key *C.char) *C.char {
+	k := C.GoString(key)
+	sapi := getCurrentSAPI()
+	if sapi == "cli" {
+		// GET /frankenphp_ws/global/get/{key}
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/global/get/%s", url.PathEscape(k))
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			caddy.Log().Error("Error creating admin global get request", zap.Error(err))
+			return C.CString("")
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			caddy.Log().Error("Error making admin global get request", zap.Error(err))
+			return C.CString("")
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return C.CString("")
+		}
+		body, _ := io.ReadAll(resp.Body)
+		return C.CString(string(body))
+	}
+
+	globalInfoMutex.RLock()
+	entry, ok := globalInformation[k]
+	globalInfoMutex.RUnlock()
+	if !ok {
+		return C.CString("")
+	}
+	if !entry.expiresAt.IsZero() && time.Now().After(entry.expiresAt) {
+		globalInfoMutex.Lock()
+		delete(globalInformation, k)
+		globalInfoMutex.Unlock()
+		return C.CString("")
+	}
+	return C.CString(entry.value)
+}
+
+//export frankenphp_ws_global_has
+func frankenphp_ws_global_has(key *C.char) C.int {
+	k := C.GoString(key)
+	sapi := getCurrentSAPI()
+	if sapi == "cli" {
+		// GET /frankenphp_ws/global/has/{key}
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/global/has/%s", url.PathEscape(k))
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return 0
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			return 1
+		}
+		return 0
+	}
+
+	globalInfoMutex.RLock()
+	entry, ok := globalInformation[k]
+	globalInfoMutex.RUnlock()
+	if ok && (entry.expiresAt.IsZero() || time.Now().Before(entry.expiresAt)) {
+		return 1
+	}
+	return 0
+}
+
+//export frankenphp_ws_global_delete
+func frankenphp_ws_global_delete(key *C.char) C.int {
+	k := C.GoString(key)
+	sapi := getCurrentSAPI()
+	if sapi == "cli" {
+		// DELETE /frankenphp_ws/global/delete/{key}
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/global/delete/%s", url.PathEscape(k))
+		req, err := http.NewRequest("DELETE", url, nil)
+		if err != nil {
+			return 0
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			return 1
+		}
+		return 0
+	}
+
+	globalInfoMutex.Lock()
+	_, existed := globalInformation[k]
+	delete(globalInformation, k)
+	globalInfoMutex.Unlock()
+	if existed {
+		return 1
+	}
+	return 0
 }
 
 //export frankenphp_ws_sendToTagExpression

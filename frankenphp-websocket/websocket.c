@@ -281,6 +281,79 @@ PHP_FUNCTION(frankenphp_ws_renameConnection)
     ZVAL_BOOL(return_value, frankenphp_ws_renameConnection(currentId, newId));
 }
 
+PHP_FUNCTION(frankenphp_ws_searchStoredInformation)
+{
+    char *key = NULL; size_t key_len = 0;
+    char *op = NULL; size_t op_len = 0;
+    char *value = NULL; size_t value_len = 0;
+    char *route = NULL; size_t route_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(3, 4)
+        Z_PARAM_STRING(key, key_len)
+        Z_PARAM_STRING(op, op_len)
+        Z_PARAM_STRING(value, value_len)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_STRING(route, route_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    array_init(return_value);
+    frankenphp_ws_searchStoredInformation((void*)return_value, key, op, value, route);
+}
+
+// ===== Global info glue =====
+PHP_FUNCTION(frankenphp_ws_global_set)
+{
+    char *key = NULL; size_t key_len = 0;
+    char *value = NULL; size_t value_len = 0;
+    zend_long expireSeconds = 0;
+
+    ZEND_PARSE_PARAMETERS_START(2, 3)
+        Z_PARAM_STRING(key, key_len)
+        Z_PARAM_STRING(value, value_len)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_LONG(expireSeconds)
+    ZEND_PARSE_PARAMETERS_END();
+
+    frankenphp_ws_global_set(key, value, (int)expireSeconds);
+}
+
+PHP_FUNCTION(frankenphp_ws_global_get)
+{
+    char *key = NULL; size_t key_len = 0; char *result = NULL;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(key, key_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    result = frankenphp_ws_global_get(key);
+    if (result != NULL) {
+        RETURN_STRING(result);
+    } else {
+        RETURN_EMPTY_STRING();
+    }
+}
+
+PHP_FUNCTION(frankenphp_ws_global_has)
+{
+    char *key = NULL; size_t key_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(key, key_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_BOOL(frankenphp_ws_global_has(key) == 1);
+}
+
+PHP_FUNCTION(frankenphp_ws_global_delete)
+{
+    char *key = NULL; size_t key_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(key, key_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_BOOL(frankenphp_ws_global_delete(key) == 1);
+}
 
 zend_module_entry ext_module_entry = {
     STANDARD_MODULE_HEADER,

@@ -1,5 +1,5 @@
 /* This is a generated file, edit the .stub.php file instead.
- * Stub hash: 07aa3e866ba950d1f3719e89329a4aa3e37d25dc */
+ * Stub hash: 27c76663afc28057c4ab267780f5778e71c84b99 */
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getClients, 0, 0, IS_ARRAY, 0)
 	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, route, IS_STRING, 1, "null")
@@ -79,6 +79,29 @@ ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_renameConnection, 
 	ZEND_ARG_TYPE_INFO(0, newId, IS_STRING, 0)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_global_set, 0, 2, IS_VOID, 0)
+	ZEND_ARG_TYPE_INFO(0, key, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, value, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, expireSeconds, IS_LONG, 0, "0")
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_global_get, 0, 1, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, key, IS_STRING, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_global_has, 0, 1, _IS_BOOL, 0)
+	ZEND_ARG_TYPE_INFO(0, key, IS_STRING, 0)
+ZEND_END_ARG_INFO()
+
+#define arginfo_frankenphp_ws_global_delete arginfo_frankenphp_ws_global_has
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_searchStoredInformation, 0, 3, IS_ARRAY, 0)
+	ZEND_ARG_TYPE_INFO(0, key, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, op, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, value, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, route, IS_STRING, 1, "null")
+ZEND_END_ARG_INFO()
+
 ZEND_FUNCTION(frankenphp_ws_getClients);
 ZEND_FUNCTION(frankenphp_ws_send);
 ZEND_FUNCTION(frankenphp_ws_tagClient);
@@ -97,6 +120,11 @@ ZEND_FUNCTION(frankenphp_ws_sendToTagExpression);
 ZEND_FUNCTION(frankenphp_ws_getClientsByTagExpression);
 ZEND_FUNCTION(frankenphp_ws_listRoutes);
 ZEND_FUNCTION(frankenphp_ws_renameConnection);
+ZEND_FUNCTION(frankenphp_ws_global_set);
+ZEND_FUNCTION(frankenphp_ws_global_get);
+ZEND_FUNCTION(frankenphp_ws_global_has);
+ZEND_FUNCTION(frankenphp_ws_global_delete);
+ZEND_FUNCTION(frankenphp_ws_searchStoredInformation);
 
 static const zend_function_entry ext_functions[] = {
 	ZEND_FE(frankenphp_ws_getClients, arginfo_frankenphp_ws_getClients)
@@ -117,5 +145,10 @@ static const zend_function_entry ext_functions[] = {
 	ZEND_FE(frankenphp_ws_getClientsByTagExpression, arginfo_frankenphp_ws_getClientsByTagExpression)
 	ZEND_FE(frankenphp_ws_listRoutes, arginfo_frankenphp_ws_listRoutes)
 	ZEND_FE(frankenphp_ws_renameConnection, arginfo_frankenphp_ws_renameConnection)
+	ZEND_FE(frankenphp_ws_global_set, arginfo_frankenphp_ws_global_set)
+	ZEND_FE(frankenphp_ws_global_get, arginfo_frankenphp_ws_global_get)
+	ZEND_FE(frankenphp_ws_global_has, arginfo_frankenphp_ws_global_has)
+	ZEND_FE(frankenphp_ws_global_delete, arginfo_frankenphp_ws_global_delete)
+	ZEND_FE(frankenphp_ws_searchStoredInformation, arginfo_frankenphp_ws_searchStoredInformation)
 	ZEND_FE_END
 };

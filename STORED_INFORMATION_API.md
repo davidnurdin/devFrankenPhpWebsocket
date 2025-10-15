@@ -187,6 +187,53 @@ if (!empty($gameStateJson)) {
 }
 ```
 
+## Recherche dans les informations stockées
+
+### `frankenphp_ws_searchStoredInformation(string $key, string $op, string $value, ?string $route = null): array`
+
+Recherche toutes les connexions dont la valeur associée à `$key` satisfait l'opérateur `$op` par rapport à `$value`. Retourne un tableau d'IDs de connexions. Optionnellement, limite la recherche aux connexions d'une `route` donnée.
+
+Opérateurs supportés:
+- `eq` : égal à (sensible à la casse)
+- `neq` : différent de (sensible à la casse)
+- `prefix` : commence par (sensible à la casse)
+- `suffix` : finit par (sensible à la casse)
+- `contains` : contient (sensible à la casse)
+- `ieq` : égal à (insensible à la casse)
+- `iprefix` : commence par (insensible à la casse)
+- `isuffix` : finit par (insensible à la casse)
+- `icontains` : contient (insensible à la casse)
+- `regex` : correspond au pattern regex (Go RE2)
+
+Exemples:
+```php
+// Trouver toutes les personnes dans un salon précis
+$clients = frankenphp_ws_searchStoredInformation('currentRoom', 'eq', 'room-42');
+
+// Trouver toutes les personnes dont la ville commence par "Gre"
+$clients = frankenphp_ws_searchStoredInformation('city', 'prefix', 'Gre');
+
+// Idem mais insensible à la casse
+$clients = frankenphp_ws_searchStoredInformation('city', 'iprefix', 'gre');
+
+// Filtrer par route (ex: "/ws/chat")
+$clients = frankenphp_ws_searchStoredInformation('currentRoom', 'eq', 'room-42', '/ws/chat');
+
+// Chercher par regex (noms finissant par un chiffre)
+$clients = frankenphp_ws_searchStoredInformation('login', 'regex', '.*\\d$');
+```
+
+### Performance et concurrence
+- Lecture protégée par `RWMutex`, filtrage en O(N) sur les connexions (optimisé si `route` est fournie).
+- Pour des schémas de requêtes très fréquents, préférez des clés stables (ex: `currentRoom`) pour des filtrages rapides.
+
+## Endpoints API Admin (recherche)
+
+- `GET /frankenphp_ws/searchStoredInformation?key=...&op=...&value=...[&route=...]`
+  - Réponse: `{ "clients": ["id1","id2",...], "count": N, "key": "...", "op": "...", "value": "...", "route": "..." }`
+
+Ces endpoints sont utilisés automatiquement par les fonctions PHP en mode CLI et peuvent être appelés directement pour le debug/intégration.
+
 ## Compatibilité CLI et Web
 
 Toutes les fonctions de stockage d'informations fonctionnent à la fois :
