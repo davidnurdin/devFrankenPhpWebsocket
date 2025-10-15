@@ -28,6 +28,19 @@ PHP_FUNCTION(frankenphp_ws_getClients)
     frankenphp_ws_getClients((void*)return_value, route);
 }
 
+PHP_FUNCTION(frankenphp_ws_getClientsCount)
+{
+    char *route = NULL;
+    size_t route_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(0, 1)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_STRING(route, route_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_LONG(frankenphp_ws_getClientsCount(route));
+}
+
 PHP_FUNCTION(frankenphp_ws_send)
 {
     char *connectionId = NULL;
@@ -109,6 +122,18 @@ PHP_FUNCTION(frankenphp_ws_getClientsByTag)
     array_init(return_value);
     // Go will iterate clients and call back frankenphp_ws_addClient for each
     frankenphp_ws_getClientsByTag((void*)return_value, tag);
+}
+
+PHP_FUNCTION(frankenphp_ws_getTagCount)
+{
+    char *tag = NULL;
+    size_t tag_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(tag, tag_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_LONG(frankenphp_ws_getTagCount(tag));
 }
 
 PHP_FUNCTION(frankenphp_ws_sendToTag)

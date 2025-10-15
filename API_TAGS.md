@@ -89,7 +89,28 @@ Récupère tous les clients ayant un tag spécifique.
 curl http://localhost:2019/frankenphp_ws/getClientsByTag/premium
 ```
 
-### 6. Récupérer tous les tags
+### 6. Compter les clients par tag
+**GET** `/frankenphp_ws/getTagCount/{tag}`
+
+Compte le nombre de clients ayant un tag spécifique.
+
+**Paramètres :**
+- `tag` (URL) : Le nom du tag
+
+**Réponse :**
+```json
+{
+  "tag": "room_general",
+  "count": 5
+}
+```
+
+**Exemple :**
+```bash
+curl http://localhost:2019/frankenphp_ws/getTagCount/room_general
+```
+
+### 7. Récupérer tous les tags
 **GET** `/frankenphp_ws/getAllTags`
 
 Récupère tous les tags existants.
@@ -130,7 +151,28 @@ curl -X POST http://localhost:2019/frankenphp_ws/sendToTag/premium \
   -d "Message pour les clients premium"
 ```
 
-### 8. Renommer une connexion
+### 8. Compter les clients par tag
+**GET** `/frankenphp_ws/getTagCount/{tag}`
+
+Compte le nombre de clients ayant un tag spécifique.
+
+**Paramètres :**
+- `tag` (URL) : Le nom du tag
+
+**Réponse :**
+```json
+{
+  "tag": "room_general",
+  "count": 5
+}
+```
+
+**Exemple :**
+```bash
+curl http://localhost:2019/frankenphp_ws/getTagCount/room_general
+```
+
+### 9. Renommer une connexion
 **POST** `/frankenphp_ws/renameConnection/{currentId}/{newId}`
 
 Renomme une connexion WebSocket en changeant son ID tout en préservant toutes les données associées.
@@ -178,6 +220,9 @@ Retourne tous les tags existants.
 ### `frankenphp_ws_getClientsByTag(string $tag): array`
 Retourne tous les clients ayant un tag spécifique.
 
+### `frankenphp_ws_getTagCount(string $tag): int`
+Compte le nombre de clients ayant un tag spécifique.
+
 ### `frankenphp_ws_sendToTag(string $tag, string $data): void`
 Envoie un message à tous les clients ayant un tag spécifique.
 
@@ -211,6 +256,27 @@ frankenphp_ws_tagClient($connectionId, 'session_' . $sessionId);
 
 // Plus tard, retirer le tag de session
 frankenphp_ws_untagClient($connectionId, 'session_' . $sessionId);
+```
+
+### Comptage de clients par tag
+```php
+// Compter le nombre de clients ayant un tag spécifique
+$roomGeneralCount = frankenphp_ws_getTagCount('room_general');
+echo "Nombre de clients dans room_general : $roomGeneralCount\n";
+
+$premiumCount = frankenphp_ws_getTagCount('premium');
+echo "Nombre de clients premium : $premiumCount\n";
+
+// Utilisation pratique pour les statistiques
+$stats = [
+    'total_online' => count(frankenphp_ws_getClients()),
+    'room_general' => frankenphp_ws_getTagCount('room_general'),
+    'room_private' => frankenphp_ws_getTagCount('room_private'),
+    'premium_users' => frankenphp_ws_getTagCount('premium'),
+    'admin_users' => frankenphp_ws_getTagCount('admin')
+];
+
+echo "Statistiques : " . json_encode($stats) . "\n";
 ```
 
 ### Renommage de connexions

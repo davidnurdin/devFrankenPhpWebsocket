@@ -1,7 +1,11 @@
 /* This is a generated file, edit the .stub.php file instead.
- * Stub hash: 1f8a1de4642a4424394247206ce0b59f635e79da */
+ * Stub hash: 8f0ed149e7b58c8b2da77c56acbe1a0a6e6e0124 */
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getClients, 0, 0, IS_ARRAY, 0)
+	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, route, IS_STRING, 1, "null")
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getClientsCount, 0, 0, IS_LONG, 0)
 	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, route, IS_STRING, 1, "null")
 ZEND_END_ARG_INFO()
 
@@ -26,6 +30,10 @@ ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getTags, 0, 0, IS_
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getClientsByTag, 0, 1, IS_ARRAY, 0)
+	ZEND_ARG_TYPE_INFO(0, tag, IS_STRING, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getTagCount, 0, 1, IS_LONG, 0)
 	ZEND_ARG_TYPE_INFO(0, tag, IS_STRING, 0)
 ZEND_END_ARG_INFO()
 
@@ -103,12 +111,14 @@ ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_searchStoredInform
 ZEND_END_ARG_INFO()
 
 ZEND_FUNCTION(frankenphp_ws_getClients);
+ZEND_FUNCTION(frankenphp_ws_getClientsCount);
 ZEND_FUNCTION(frankenphp_ws_send);
 ZEND_FUNCTION(frankenphp_ws_tagClient);
 ZEND_FUNCTION(frankenphp_ws_untagClient);
 ZEND_FUNCTION(frankenphp_ws_clearTagClient);
 ZEND_FUNCTION(frankenphp_ws_getTags);
 ZEND_FUNCTION(frankenphp_ws_getClientsByTag);
+ZEND_FUNCTION(frankenphp_ws_getTagCount);
 ZEND_FUNCTION(frankenphp_ws_sendToTag);
 ZEND_FUNCTION(frankenphp_ws_setStoredInformation);
 ZEND_FUNCTION(frankenphp_ws_getStoredInformation);
@@ -128,12 +138,14 @@ ZEND_FUNCTION(frankenphp_ws_searchStoredInformation);
 
 static const zend_function_entry ext_functions[] = {
 	ZEND_FE(frankenphp_ws_getClients, arginfo_frankenphp_ws_getClients)
+	ZEND_FE(frankenphp_ws_getClientsCount, arginfo_frankenphp_ws_getClientsCount)
 	ZEND_FE(frankenphp_ws_send, arginfo_frankenphp_ws_send)
 	ZEND_FE(frankenphp_ws_tagClient, arginfo_frankenphp_ws_tagClient)
 	ZEND_FE(frankenphp_ws_untagClient, arginfo_frankenphp_ws_untagClient)
 	ZEND_FE(frankenphp_ws_clearTagClient, arginfo_frankenphp_ws_clearTagClient)
 	ZEND_FE(frankenphp_ws_getTags, arginfo_frankenphp_ws_getTags)
 	ZEND_FE(frankenphp_ws_getClientsByTag, arginfo_frankenphp_ws_getClientsByTag)
+	ZEND_FE(frankenphp_ws_getTagCount, arginfo_frankenphp_ws_getTagCount)
 	ZEND_FE(frankenphp_ws_sendToTag, arginfo_frankenphp_ws_sendToTag)
 	ZEND_FE(frankenphp_ws_setStoredInformation, arginfo_frankenphp_ws_setStoredInformation)
 	ZEND_FE(frankenphp_ws_getStoredInformation, arginfo_frankenphp_ws_getStoredInformation)
@@ -152,3 +164,17 @@ static const zend_function_entry ext_functions[] = {
 	ZEND_FE(frankenphp_ws_searchStoredInformation, arginfo_frankenphp_ws_searchStoredInformation)
 	ZEND_FE_END
 };
+
+static void register_websocket_symbols(int module_number)
+{
+	REGISTER_STRING_CONSTANT("FRANKENPHP_WS_OP_EQ", "eq", CONST_PERSISTENT);
+	REGISTER_STRING_CONSTANT("FRANKENPHP_WS_OP_NEQ", "neq", CONST_PERSISTENT);
+	REGISTER_STRING_CONSTANT("FRANKENPHP_WS_OP_PREFIX", "prefix", CONST_PERSISTENT);
+	REGISTER_STRING_CONSTANT("FRANKENPHP_WS_OP_SUFFIX", "suffix", CONST_PERSISTENT);
+	REGISTER_STRING_CONSTANT("FRANKENPHP_WS_OP_CONTAINS", "contains", CONST_PERSISTENT);
+	REGISTER_STRING_CONSTANT("FRANKENPHP_WS_OP_IEQ", "ieq", CONST_PERSISTENT);
+	REGISTER_STRING_CONSTANT("FRANKENPHP_WS_OP_IPREFIX", "iprefix", CONST_PERSISTENT);
+	REGISTER_STRING_CONSTANT("FRANKENPHP_WS_OP_ISUFFIX", "isuffix", CONST_PERSISTENT);
+	REGISTER_STRING_CONSTANT("FRANKENPHP_WS_OP_ICONTAINS", "icontains", CONST_PERSISTENT);
+	REGISTER_STRING_CONSTANT("FRANKENPHP_WS_OP_REGEX", "regex", CONST_PERSISTENT);
+}

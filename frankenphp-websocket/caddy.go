@@ -672,7 +672,41 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				})
 			}),
 		},
+		// ===== ENDPOINTS POUR LE COMPTAGE DE CLIENTS =====
+		{
+			Pattern: "/frankenphp_ws/getClientsCount",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				route := r.URL.Query().Get("route")
+				count := WSGetClientsCount(route)
+
+				response := map[string]any{"count": count}
+				if route != "" {
+					response["route"] = route
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(response)
+			}),
+		},
 		// ===== ENDPOINTS POUR LA LOGIQUE DE TAGS =====
+		{
+			Pattern: "/frankenphp_ws/getTagCount/{tag}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				tag := r.PathValue("tag")
+				if tag == "" {
+					return caddy.APIError{HTTPStatus: http.StatusBadRequest, Err: fmt.Errorf("tag is required")}
+				}
+				count := WSGetTagCount(tag)
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(map[string]any{"tag": tag, "count": count})
+			}),
+		},
 		{
 			Pattern: "/frankenphp_ws/searchStoredInformation",
 			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
@@ -1711,6 +1745,54 @@ func WSHasStoredInformation(connectionID, key string) bool {
 		return exists
 	}
 	return false
+}
+
+// ===== COMPTAGE DE CLIENTS =====
+
+// WSGetClientsCount retourne le nombre de connexions actives, optionnellement filtré par route
+func WSGetClientsCount(route string) int {
+	if route == "" {
+		// Retourner le nombre total de connexions
+		connIDsMutex.RLock()
+		count := 0
+		connIDs.Range(func(_, v any) bool {
+			count++
+			return true
+		})
+		connIDsMutex.RUnlock()
+		return count
+	}
+
+	// Compter les connexions pour une route spécifique
+	connIDsMutex.RLock()
+	connRoutesMutex.RLock()
+	count := 0
+	connIDs.Range(func(_, v any) bool {
+		connectionID := v.(string)
+		if connRoutes[connectionID] == route {
+			count++
+		}
+		return true
+	})
+	connRoutesMutex.RUnlock()
+	connIDsMutex.RUnlock()
+	return count
+}
+
+// ===== COMPTAGE DE TAGS =====
+
+// WSGetTagCount retourne le nombre de connexions ayant le tag spécifié
+func WSGetTagCount(tag string) int {
+	connTagsMutex.RLock()
+	defer connTagsMutex.RUnlock()
+
+	count := 0
+	for _, tags := range connTags {
+		if tags[tag] {
+			count++
+		}
+	}
+	return count
 }
 
 // ===== RECHERCHE DANS LES INFORMATIONS STOCKÉES =====

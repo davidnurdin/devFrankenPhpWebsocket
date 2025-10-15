@@ -776,6 +776,87 @@ func frankenphp_ws_listStoredInformationKeys(array unsafe.Pointer, connectionID 
 	caddy.Log().Info("WS stored information keys list", zap.String("id", id), zap.Int("count", len(keys)), zap.Strings("keys", keys))
 }
 
+//export frankenphp_ws_getClientsCount
+func frankenphp_ws_getClientsCount(route *C.char) C.int {
+	routeStr := C.GoString(route)
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// GET /frankenphp_ws/getClientsCount?route=...
+		urlStr := "http://localhost:2019/frankenphp_ws/getClientsCount"
+		if routeStr != "" {
+			urlStr = urlStr + "?route=" + url.QueryEscape(routeStr)
+		}
+		req, err := http.NewRequest("GET", urlStr, nil)
+		if err != nil {
+			return 0
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return 0
+		}
+
+		var response struct {
+			Count int    `json:"count"`
+			Route string `json:"route,omitempty"`
+		}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return 0
+		}
+
+		return C.int(response.Count)
+	}
+
+	// Mode Caddy/server : utilisation directe
+	count := WSGetClientsCount(routeStr)
+	return C.int(count)
+}
+
+//export frankenphp_ws_getTagCount
+func frankenphp_ws_getTagCount(tag *C.char) C.int {
+	tagStr := C.GoString(tag)
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// GET /frankenphp_ws/getTagCount/{tag}
+		url := fmt.Sprintf("http://localhost:2019/frankenphp_ws/getTagCount/%s", url.PathEscape(tagStr))
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return 0
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return 0
+		}
+
+		var response struct {
+			Tag   string `json:"tag"`
+			Count int    `json:"count"`
+		}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return 0
+		}
+
+		return C.int(response.Count)
+	}
+
+	// Mode Caddy/server : utilisation directe
+	count := WSGetTagCount(tagStr)
+	return C.int(count)
+}
+
 //export frankenphp_ws_searchStoredInformation
 func frankenphp_ws_searchStoredInformation(array unsafe.Pointer, key *C.char, op *C.char, value *C.char, route *C.char) {
 	// Protéger contre les appels concurrents (retour tableau)
