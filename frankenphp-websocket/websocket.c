@@ -60,6 +60,22 @@ PHP_FUNCTION(frankenphp_ws_send)
     frankenphp_ws_send(connectionId, data, (int)data_len, route);
 }
 
+PHP_FUNCTION(frankenphp_ws_sendAll)
+{
+    char *data = NULL;
+    size_t data_len = 0;
+    char *route = NULL;
+    size_t route_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 2)
+        Z_PARAM_STRING(data, data_len)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_STRING(route, route_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_LONG(frankenphp_ws_sendAll(data, (int)data_len, route));
+}
+
 PHP_FUNCTION(frankenphp_ws_tagClient)
 {
     char *connectionId = NULL;

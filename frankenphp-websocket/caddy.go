@@ -672,6 +672,31 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				})
 			}),
 		},
+		// ===== ENDPOINTS POUR L'ENVOI MASSIF =====
+		{
+			Pattern: "/frankenphp_ws/sendAll",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodPost {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				route := r.URL.Query().Get("route")
+
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					return caddy.APIError{HTTPStatus: http.StatusBadRequest, Err: fmt.Errorf("failed to read body: %v", err)}
+				}
+
+				sentCount := WSSendAll(body, route)
+
+				response := map[string]any{"sentCount": sentCount}
+				if route != "" {
+					response["route"] = route
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(response)
+			}),
+		},
 		// ===== ENDPOINTS POUR LE COMPTAGE DE CLIENTS =====
 		{
 			Pattern: "/frankenphp_ws/getClientsCount",
@@ -1745,6 +1770,39 @@ func WSHasStoredInformation(connectionID, key string) bool {
 		return exists
 	}
 	return false
+}
+
+// ===== ENVOI MASSIF =====
+
+// WSSendAll envoie un message à tous les clients connectés, optionnellement filtré par route
+func WSSendAll(data []byte, route string) int {
+	connIDsMutex.RLock()
+	connRoutesMutex.RLock()
+	sentCount := 0
+
+	connIDs.Range(func(k, v any) bool {
+		connectionID := v.(string)
+		target := k.(*gws.Conn)
+
+		// Si une route est spécifiée, vérifier que la connexion est sur cette route
+		if route != "" {
+			if connRoutes[connectionID] != route {
+				return true // Continuer avec la prochaine connexion
+			}
+		}
+
+		// Envoyer le message à cette connexion
+		if err := target.WriteMessage(gws.OpcodeBinary, data); err == nil {
+			sentCount++
+		} else {
+			caddy.Log().Error("WS sendAll failed", zap.String("connectionID", connectionID), zap.String("route", route), zap.Error(err))
+		}
+		return true
+	})
+
+	connRoutesMutex.RUnlock()
+	connIDsMutex.RUnlock()
+	return sentCount
 }
 
 // ===== COMPTAGE DE CLIENTS =====

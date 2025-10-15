@@ -776,6 +776,50 @@ func frankenphp_ws_listStoredInformationKeys(array unsafe.Pointer, connectionID 
 	caddy.Log().Info("WS stored information keys list", zap.String("id", id), zap.Int("count", len(keys)), zap.Strings("keys", keys))
 }
 
+//export frankenphp_ws_sendAll
+func frankenphp_ws_sendAll(data *C.char, dataLen C.int, route *C.char) C.int {
+	dataStr := C.GoStringN(data, dataLen)
+	routeStr := C.GoString(route)
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// POST /frankenphp_ws/sendAll?route=...
+		urlStr := "http://localhost:2019/frankenphp_ws/sendAll"
+		if routeStr != "" {
+			urlStr = urlStr + "?route=" + url.QueryEscape(routeStr)
+		}
+		req, err := http.NewRequest("POST", urlStr, bytes.NewReader([]byte(dataStr)))
+		if err != nil {
+			return 0
+		}
+		req.Header.Set("Content-Type", "application/octet-stream")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return 0
+		}
+
+		var response struct {
+			SentCount int    `json:"sentCount"`
+			Route     string `json:"route,omitempty"`
+		}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return 0
+		}
+
+		return C.int(response.SentCount)
+	}
+
+	// Mode Caddy/server : utilisation directe
+	sentCount := WSSendAll([]byte(dataStr), routeStr)
+	return C.int(sentCount)
+}
+
 //export frankenphp_ws_getClientsCount
 func frankenphp_ws_getClientsCount(route *C.char) C.int {
 	routeStr := C.GoString(route)
