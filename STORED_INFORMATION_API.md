@@ -194,33 +194,35 @@ if (!empty($gameStateJson)) {
 Recherche toutes les connexions dont la valeur associée à `$key` satisfait l'opérateur `$op` par rapport à `$value`. Retourne un tableau d'IDs de connexions. Optionnellement, limite la recherche aux connexions d'une `route` donnée.
 
 Opérateurs supportés:
-- `eq` : égal à (sensible à la casse)
-- `neq` : différent de (sensible à la casse)
-- `prefix` : commence par (sensible à la casse)
-- `suffix` : finit par (sensible à la casse)
-- `contains` : contient (sensible à la casse)
-- `ieq` : égal à (insensible à la casse)
-- `iprefix` : commence par (insensible à la casse)
-- `isuffix` : finit par (insensible à la casse)
-- `icontains` : contient (insensible à la casse)
-- `regex` : correspond au pattern regex (Go RE2)
+Vous pouvez utiliser directement les constantes PHP suivantes exposées par l’extension:
+
+- `FRANKENPHP_WS_OP_EQ` : égal à (sensible à la casse)
+- `FRANKENPHP_WS_OP_NEQ` : différent de (sensible à la casse)
+- `FRANKENPHP_WS_OP_PREFIX` : commence par (sensible à la casse)
+- `FRANKENPHP_WS_OP_SUFFIX` : finit par (sensible à la casse)
+- `FRANKENPHP_WS_OP_CONTAINS` : contient (sensible à la casse)
+- `FRANKENPHP_WS_OP_IEQ` : égal à (insensible à la casse)
+- `FRANKENPHP_WS_OP_IPREFIX` : commence par (insensible à la casse)
+- `FRANKENPHP_WS_OP_ISUFFIX` : finit par (insensible à la casse)
+- `FRANKENPHP_WS_OP_ICONTAINS` : contient (insensible à la casse)
+- `FRANKENPHP_WS_OP_REGEX` : correspond au pattern regex (Go RE2)
 
 Exemples:
 ```php
 // Trouver toutes les personnes dans un salon précis
-$clients = frankenphp_ws_searchStoredInformation('currentRoom', 'eq', 'room-42');
+$clients = frankenphp_ws_searchStoredInformation('currentRoom', FRANKENPHP_WS_OP_EQ, 'room-42');
 
 // Trouver toutes les personnes dont la ville commence par "Gre"
-$clients = frankenphp_ws_searchStoredInformation('city', 'prefix', 'Gre');
+$clients = frankenphp_ws_searchStoredInformation('city', FRANKENPHP_WS_OP_PREFIX, 'Gre');
 
 // Idem mais insensible à la casse
-$clients = frankenphp_ws_searchStoredInformation('city', 'iprefix', 'gre');
+$clients = frankenphp_ws_searchStoredInformation('city', FRANKENPHP_WS_OP_IPREFIX, 'gre');
 
 // Filtrer par route (ex: "/ws/chat")
-$clients = frankenphp_ws_searchStoredInformation('currentRoom', 'eq', 'room-42', '/ws/chat');
+$clients = frankenphp_ws_searchStoredInformation('currentRoom', FRANKENPHP_WS_OP_EQ, 'room-42', '/ws/chat');
 
 // Chercher par regex (noms finissant par un chiffre)
-$clients = frankenphp_ws_searchStoredInformation('login', 'regex', '.*\\d$');
+$clients = frankenphp_ws_searchStoredInformation('login', FRANKENPHP_WS_OP_REGEX, '.*\\d$');
 ```
 
 ### Performance et concurrence

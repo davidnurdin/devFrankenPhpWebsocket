@@ -47,4 +47,18 @@ function frankenphp_ws_global_delete(string $key): bool {}
 
 // ===== Stored Information search =====
 // Retourne la liste d'IDs correspondant à key/op/value, filtrable par route
+/**
+ * Constantes PHP pour les opérateurs de recherche:
+ * - FRANKENPHP_WS_OP_EQ         => 'eq'
+ * - FRANKENPHP_WS_OP_NEQ        => 'neq'
+ * - FRANKENPHP_WS_OP_PREFIX     => 'prefix'
+ * - FRANKENPHP_WS_OP_SUFFIX     => 'suffix'
+ * - FRANKENPHP_WS_OP_CONTAINS   => 'contains'
+ * - FRANKENPHP_WS_OP_IEQ        => 'ieq'
+ * - FRANKENPHP_WS_OP_IPREFIX    => 'iprefix'
+ * - FRANKENPHP_WS_OP_ISUFFIX    => 'isuffix'
+ * - FRANKENPHP_WS_OP_ICONTAINS  => 'icontains'
+ * - FRANKENPHP_WS_OP_REGEX      => 'regex'
+ */
 function frankenphp_ws_searchStoredInformation(string $key, string $op, string $value, ?string $route = null): array {}
+
