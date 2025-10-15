@@ -12,6 +12,12 @@ function frankenphp_ws_sendAll(string $data, ?string $route = null): int {}
 
 function frankenphp_ws_killConnection(string $connectionId): bool {}
 
+function frankenphp_ws_getClientPingTime(string $connectionId): int {}
+
+function frankenphp_ws_enablePing(string $connectionId, int $intervalMs = 0): bool {}
+
+function frankenphp_ws_disablePing(string $connectionId): bool {}
+
 function frankenphp_ws_tagClient(string $connectionId, string $tag): void {}
 
 function frankenphp_ws_untagClient(string $connectionId, string $tag): void {}

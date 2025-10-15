@@ -776,6 +776,142 @@ func frankenphp_ws_listStoredInformationKeys(array unsafe.Pointer, connectionID 
 	caddy.Log().Info("WS stored information keys list", zap.String("id", id), zap.Int("count", len(keys)), zap.Strings("keys", keys))
 }
 
+//export frankenphp_ws_enablePing
+func frankenphp_ws_enablePing(connectionID *C.char, intervalMs C.int) C.int {
+	connectionIDStr := C.GoString(connectionID)
+	interval := time.Duration(intervalMs) * time.Millisecond
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// POST /frankenphp_ws/enablePing/{clientID}?interval=...
+		urlStr := fmt.Sprintf("http://localhost:2019/frankenphp_ws/enablePing/%s", url.PathEscape(connectionIDStr))
+		if intervalMs > 0 {
+			urlStr = fmt.Sprintf("%s?interval=%d", urlStr, intervalMs)
+		}
+		req, err := http.NewRequest("POST", urlStr, nil)
+		if err != nil {
+			return 0
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return 0
+		}
+
+		var response struct {
+			ClientID string `json:"clientID"`
+			Success  bool   `json:"success"`
+			Action   string `json:"action"`
+		}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return 0
+		}
+
+		if response.Success {
+			return 1
+		}
+		return 0
+	}
+
+	// Mode Caddy/server : utilisation directe
+	success := WSEnablePing(connectionIDStr, interval)
+	if success {
+		return 1
+	}
+	return 0
+}
+
+//export frankenphp_ws_disablePing
+func frankenphp_ws_disablePing(connectionID *C.char) C.int {
+	connectionIDStr := C.GoString(connectionID)
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// POST /frankenphp_ws/disablePing/{clientID}
+		urlStr := fmt.Sprintf("http://localhost:2019/frankenphp_ws/disablePing/%s", url.PathEscape(connectionIDStr))
+		req, err := http.NewRequest("POST", urlStr, nil)
+		if err != nil {
+			return 0
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return 0
+		}
+
+		var response struct {
+			ClientID string `json:"clientID"`
+			Success  bool   `json:"success"`
+			Action   string `json:"action"`
+		}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return 0
+		}
+
+		if response.Success {
+			return 1
+		}
+		return 0
+	}
+
+	// Mode Caddy/server : utilisation directe
+	success := WSDisablePing(connectionIDStr)
+	if success {
+		return 1
+	}
+	return 0
+}
+
+//export frankenphp_ws_getClientPingTime
+func frankenphp_ws_getClientPingTime(connectionID *C.char) C.long {
+	connectionIDStr := C.GoString(connectionID)
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// GET /frankenphp_ws/getClientPingTime/{clientID}
+		urlStr := fmt.Sprintf("http://localhost:2019/frankenphp_ws/getClientPingTime/%s", url.PathEscape(connectionIDStr))
+		req, err := http.NewRequest("GET", urlStr, nil)
+		if err != nil {
+			return 0
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return 0
+		}
+
+		var response struct {
+			ClientID   string  `json:"clientID"`
+			PingTime   int64   `json:"pingTime"`
+			PingTimeMs float64 `json:"pingTimeMs"`
+		}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return 0
+		}
+
+		return C.long(response.PingTime)
+	}
+
+	// Mode Caddy/server : utilisation directe
+	pingTime := WSGetClientPingTime(connectionIDStr)
+	return C.long(pingTime.Nanoseconds())
+}
+
 //export frankenphp_ws_killConnection
 func frankenphp_ws_killConnection(connectionID *C.char) C.int {
 	connectionIDStr := C.GoString(connectionID)

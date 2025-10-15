@@ -1,5 +1,5 @@
 /* This is a generated file, edit the .stub.php file instead.
- * Stub hash: 7f344cfbed75c69ad6626153fdb64853125c6363 */
+ * Stub hash: 96fef238954162a65a77adc0d9ef7f065499e1b1 */
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getClients, 0, 0, IS_ARRAY, 0)
 	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, route, IS_STRING, 1, "null")
@@ -23,6 +23,17 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_killConnection, 0, 1, _IS_BOOL, 0)
 	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
 ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getClientPingTime, 0, 1, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_enablePing, 0, 1, _IS_BOOL, 0)
+	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, intervalMs, IS_LONG, 0, "0")
+ZEND_END_ARG_INFO()
+
+#define arginfo_frankenphp_ws_disablePing arginfo_frankenphp_ws_killConnection
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_tagClient, 0, 2, IS_VOID, 0)
 	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
@@ -124,6 +135,9 @@ ZEND_FUNCTION(frankenphp_ws_getClientsCount);
 ZEND_FUNCTION(frankenphp_ws_send);
 ZEND_FUNCTION(frankenphp_ws_sendAll);
 ZEND_FUNCTION(frankenphp_ws_killConnection);
+ZEND_FUNCTION(frankenphp_ws_getClientPingTime);
+ZEND_FUNCTION(frankenphp_ws_enablePing);
+ZEND_FUNCTION(frankenphp_ws_disablePing);
 ZEND_FUNCTION(frankenphp_ws_tagClient);
 ZEND_FUNCTION(frankenphp_ws_untagClient);
 ZEND_FUNCTION(frankenphp_ws_clearTagClient);
@@ -153,6 +167,9 @@ static const zend_function_entry ext_functions[] = {
 	ZEND_FE(frankenphp_ws_send, arginfo_frankenphp_ws_send)
 	ZEND_FE(frankenphp_ws_sendAll, arginfo_frankenphp_ws_sendAll)
 	ZEND_FE(frankenphp_ws_killConnection, arginfo_frankenphp_ws_killConnection)
+	ZEND_FE(frankenphp_ws_getClientPingTime, arginfo_frankenphp_ws_getClientPingTime)
+	ZEND_FE(frankenphp_ws_enablePing, arginfo_frankenphp_ws_enablePing)
+	ZEND_FE(frankenphp_ws_disablePing, arginfo_frankenphp_ws_disablePing)
 	ZEND_FE(frankenphp_ws_tagClient, arginfo_frankenphp_ws_tagClient)
 	ZEND_FE(frankenphp_ws_untagClient, arginfo_frankenphp_ws_untagClient)
 	ZEND_FE(frankenphp_ws_clearTagClient, arginfo_frankenphp_ws_clearTagClient)

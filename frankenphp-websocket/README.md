@@ -10,6 +10,8 @@ Extension WebSocket pour FrankenPHP avec support des tags, stockage d'informatio
 - **[API Clients Count](CLIENTS_COUNT_API.md)** - Comptage des clients connectés
 - **[API Send All](SEND_ALL_API.md)** - Envoi massif de messages
 - **[API Kill Connection](KILL_CONNECTION_API.md)** - Fermeture forcée de connexions
+- **[API Ping Time](PING_TIME_API.md)** - Mesure du temps de ping/pong
+- **[API Ping Périodique](PERIODIC_PING_API.md)** - Ping automatique à intervalles réguliers
 
 ## Fonctions principales
 
@@ -19,6 +21,9 @@ Extension WebSocket pour FrankenPHP avec support des tags, stockage d'informatio
 - `frankenphp_ws_send(string $connectionId, string $data, ?string $route = null): void` - Envoi de message
 - `frankenphp_ws_sendAll(string $data, ?string $route = null): int` - Envoi massif
 - `frankenphp_ws_killConnection(string $connectionId): bool` - Fermeture forcée
+- `frankenphp_ws_getClientPingTime(string $connectionId): int` - Temps de ping
+- `frankenphp_ws_enablePing(string $connectionId, int $intervalMs = 0): bool` - Activer ping/pong avec intervalle optionnel
+- `frankenphp_ws_disablePing(string $connectionId): bool` - Désactiver ping/pong
 
 ### Système de tags
 - `frankenphp_ws_tagClient(string $connectionId, string $tag): void` - Ajouter un tag
@@ -51,6 +56,13 @@ $chatSentCount = frankenphp_ws_sendAll("Message au chat", "/chat");
 
 // Fermeture forcée
 $success = frankenphp_ws_killConnection("client_123");
+
+// Temps de ping
+frankenphp_ws_enablePing("client_123"); // Activer le ping/pong (sans ping périodique)
+frankenphp_ws_enablePing("client_123", 5000); // Activer le ping/pong avec ping toutes les 5 secondes
+$pingTimeNs = frankenphp_ws_getClientPingTime("client_123");
+$pingTimeMs = $pingTimeNs / 1000000; // Convertir en millisecondes
+frankenphp_ws_disablePing("client_123"); // Désactiver le ping (arrête aussi le ping périodique)
 
 // Gestion des tags
 frankenphp_ws_tagClient($connectionId, 'premium');

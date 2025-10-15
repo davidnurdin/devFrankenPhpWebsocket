@@ -88,6 +88,45 @@ PHP_FUNCTION(frankenphp_ws_killConnection)
     RETURN_BOOL(frankenphp_ws_killConnection(connectionId) == 1);
 }
 
+PHP_FUNCTION(frankenphp_ws_getClientPingTime)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_LONG(frankenphp_ws_getClientPingTime(connectionId));
+}
+
+PHP_FUNCTION(frankenphp_ws_enablePing)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+    zend_long intervalMs = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 2)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_LONG(intervalMs)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_BOOL(frankenphp_ws_enablePing(connectionId, (int)intervalMs) == 1);
+}
+
+PHP_FUNCTION(frankenphp_ws_disablePing)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_BOOL(frankenphp_ws_disablePing(connectionId) == 1);
+}
+
 PHP_FUNCTION(frankenphp_ws_tagClient)
 {
     char *connectionId = NULL;
