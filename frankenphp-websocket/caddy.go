@@ -1140,6 +1140,8 @@ func (h *MyHandler) OnOpen(socket *gws.Conn) {
 }
 
 func (h *MyHandler) OnPing(socket *gws.Conn, payload []byte) {
+	caddy.Log().Info("WS OnPing called", zap.String("payload", string(payload)), zap.String("remoteAddr", socket.RemoteAddr().String()))
+
 	// Récupérer l'ID de connexion
 	connIDsMutex.RLock()
 	var connectionID string
@@ -1152,11 +1154,15 @@ func (h *MyHandler) OnPing(socket *gws.Conn, payload []byte) {
 	})
 	connIDsMutex.RUnlock()
 
+	caddy.Log().Info("WS OnPing connectionID", zap.String("connectionID", connectionID))
+
 	if connectionID != "" {
 		// Vérifier si le ping est activé pour ce client
 		pingTimesMutex.RLock()
 		pingEnabled := clientPingEnabled[connectionID]
 		pingTimesMutex.RUnlock()
+
+		caddy.Log().Info("WS OnPing pingEnabled", zap.String("connectionID", connectionID), zap.Bool("pingEnabled", pingEnabled))
 
 		if pingEnabled {
 			// Stocker le timestamp du ping
@@ -1164,20 +1170,26 @@ func (h *MyHandler) OnPing(socket *gws.Conn, payload []byte) {
 			clientPingTimestamps[connectionID] = time.Now()
 			pingTimesMutex.Unlock()
 
+			caddy.Log().Info("WS OnPing timestamp stored", zap.String("connectionID", connectionID), zap.Time("timestamp", time.Now()))
+
 			// Envoyer le pong en réponse
 			if err := socket.WritePong(payload); err != nil {
 				caddy.Log().Error("WS ping response failed", zap.String("connectionID", connectionID), zap.Error(err))
 			} else {
-				caddy.Log().Debug("WS ping received and pong sent", zap.String("connectionID", connectionID))
+				caddy.Log().Info("WS ping received and pong sent", zap.String("connectionID", connectionID), zap.String("payload", string(payload)))
 			}
 		} else {
 			// Ping désactivé pour ce client, ignorer
-			caddy.Log().Debug("WS ping received but disabled for client", zap.String("connectionID", connectionID))
+			caddy.Log().Info("WS ping received but ping disabled for client", zap.String("connectionID", connectionID))
 		}
+	} else {
+		caddy.Log().Warn("WS OnPing: connectionID not found", zap.String("remoteAddr", socket.RemoteAddr().String()))
 	}
 }
 
 func (h *MyHandler) OnPong(socket *gws.Conn, payload []byte) {
+	caddy.Log().Info("WS OnPong called", zap.String("payload", string(payload)), zap.String("remoteAddr", socket.RemoteAddr().String()))
+
 	// Récupérer l'ID de connexion
 	connIDsMutex.RLock()
 	var connectionID string
@@ -1190,11 +1202,15 @@ func (h *MyHandler) OnPong(socket *gws.Conn, payload []byte) {
 	})
 	connIDsMutex.RUnlock()
 
+	caddy.Log().Info("WS OnPong connectionID", zap.String("connectionID", connectionID))
+
 	if connectionID != "" {
 		// Vérifier si le ping est activé pour ce client
 		pingTimesMutex.RLock()
 		pingEnabled := clientPingEnabled[connectionID]
 		pingTimesMutex.RUnlock()
+
+		caddy.Log().Info("WS OnPong pingEnabled", zap.String("connectionID", connectionID), zap.Bool("pingEnabled", pingEnabled))
 
 		if pingEnabled {
 			// Calculer le temps de réponse réel
@@ -1203,17 +1219,19 @@ func (h *MyHandler) OnPong(socket *gws.Conn, payload []byte) {
 				pingTime := time.Since(pingTimestamp)
 				clientPingTimes[connectionID] = pingTime
 				delete(clientPingTimestamps, connectionID) // Nettoyer le timestamp
-				caddy.Log().Debug("WS pong received", zap.String("connectionID", connectionID), zap.Duration("pingTime", pingTime))
+				caddy.Log().Info("WS pong received - ping time calculated", zap.String("connectionID", connectionID), zap.Duration("pingTime", pingTime), zap.String("pingTimeMs", fmt.Sprintf("%.2f", float64(pingTime.Nanoseconds())/1000000)))
 			} else {
 				// Pas de ping correspondant, utiliser une valeur par défaut
 				clientPingTimes[connectionID] = time.Millisecond * 5
-				caddy.Log().Debug("WS pong received without corresponding ping", zap.String("connectionID", connectionID))
+				caddy.Log().Info("WS pong received without corresponding ping", zap.String("connectionID", connectionID))
 			}
 			pingTimesMutex.Unlock()
 		} else {
 			// Ping désactivé pour ce client, ignorer
-			caddy.Log().Debug("WS pong received but ping disabled for client", zap.String("connectionID", connectionID))
+			caddy.Log().Info("WS pong received but ping disabled for client", zap.String("connectionID", connectionID))
 		}
+	} else {
+		caddy.Log().Warn("WS OnPong: connectionID not found", zap.String("remoteAddr", socket.RemoteAddr().String()))
 	}
 }
 
@@ -1977,11 +1995,20 @@ func WSGetClientPingTime(connectionID string) time.Duration {
 	pingTimesMutex.RLock()
 	defer pingTimesMutex.RUnlock()
 
+	caddy.Log().Info("WS GetClientPingTime called", zap.String("connectionID", connectionID))
+
+	// Log de l'état des maps
+	caddy.Log().Info("WS GetClientPingTime - ping enabled status", zap.Bool("pingEnabled", clientPingEnabled[connectionID]))
+	caddy.Log().Info("WS GetClientPingTime - ping times map", zap.Any("clientPingTimes", clientPingTimes))
+	caddy.Log().Info("WS GetClientPingTime - ping timestamps map", zap.Any("clientPingTimestamps", clientPingTimestamps))
+
 	if pingTime, exists := clientPingTimes[connectionID]; exists {
+		caddy.Log().Info("WS GetClientPingTime - ping time found", zap.String("connectionID", connectionID), zap.Duration("pingTime", pingTime), zap.String("pingTimeMs", fmt.Sprintf("%.2f", float64(pingTime.Nanoseconds())/1000000)))
 		return pingTime
 	}
 
 	// Retourner 0 si pas de données de ping disponibles
+	caddy.Log().Info("WS GetClientPingTime - no ping time found, returning 0", zap.String("connectionID", connectionID))
 	return 0
 }
 
@@ -1991,16 +2018,32 @@ func WSEnablePing(connectionID string, interval time.Duration) bool {
 	pingTimesMutex.Lock()
 	defer pingTimesMutex.Unlock()
 
+	caddy.Log().Info("WS EnablePing called", zap.String("connectionID", connectionID), zap.Duration("interval", interval))
+
 	clientPingEnabled[connectionID] = true
-	caddy.Log().Info("WS ping enabled for client", zap.String("connectionID", connectionID))
+	caddy.Log().Info("WS ping enabled for client", zap.String("connectionID", connectionID), zap.Duration("interval", interval))
 
 	// Si un intervalle est spécifié, démarrer le ping périodique
 	if interval > 0 {
+		caddy.Log().Info("WS EnablePing - starting periodic ping", zap.String("connectionID", connectionID), zap.Duration("interval", interval))
 		pingTimesMutex.Unlock() // Débloquer pour permettre l'appel à WSStartPeriodicPing
 		success := WSStartPeriodicPing(connectionID, interval)
 		pingTimesMutex.Lock() // Rebloquer
 		if !success {
 			caddy.Log().Warn("WS failed to start periodic ping", zap.String("connectionID", connectionID), zap.Duration("interval", interval))
+		} else {
+			caddy.Log().Info("WS periodic ping started successfully", zap.String("connectionID", connectionID), zap.Duration("interval", interval))
+		}
+	} else {
+		caddy.Log().Info("WS EnablePing - no interval specified, sending manual ping", zap.String("connectionID", connectionID))
+		// Envoyer un ping manuel immédiatement
+		pingTimesMutex.Unlock() // Débloquer pour permettre l'appel à WSSendManualPing
+		success := WSSendManualPing(connectionID)
+		pingTimesMutex.Lock() // Rebloquer
+		if !success {
+			caddy.Log().Warn("WS failed to send manual ping", zap.String("connectionID", connectionID))
+		} else {
+			caddy.Log().Info("WS manual ping sent successfully", zap.String("connectionID", connectionID))
 		}
 	}
 
@@ -2012,11 +2055,16 @@ func WSDisablePing(connectionID string) bool {
 	pingTimesMutex.Lock()
 	defer pingTimesMutex.Unlock()
 
+	caddy.Log().Info("WS DisablePing called", zap.String("connectionID", connectionID))
+
 	clientPingEnabled[connectionID] = false
 	// Arrêter le timer de ping périodique s'il existe
 	if timer, exists := clientPingTimers[connectionID]; exists {
+		caddy.Log().Info("WS DisablePing - stopping periodic timer", zap.String("connectionID", connectionID))
 		timer.Stop()
 		delete(clientPingTimers, connectionID)
+	} else {
+		caddy.Log().Info("WS DisablePing - no periodic timer found", zap.String("connectionID", connectionID))
 	}
 	// Nettoyer les données de ping existantes
 	delete(clientPingTimes, connectionID)
@@ -2058,13 +2106,23 @@ func WSStartPeriodicPing(connectionID string, interval time.Duration) bool {
 
 	// Créer un nouveau timer
 	timer := time.AfterFunc(interval, func() {
+		caddy.Log().Info("WS periodic ping timer triggered", zap.String("connectionID", connectionID), zap.Duration("interval", interval))
+
 		// Envoyer un ping
-		if err := target.WriteMessage(gws.OpcodePing, []byte("ping")); err != nil {
+		pingData := []byte(fmt.Sprintf("ping_%d", time.Now().UnixNano()))
+		if err := target.WriteMessage(gws.OpcodePing, pingData); err != nil {
 			caddy.Log().Error("WS periodic ping failed", zap.String("connectionID", connectionID), zap.Error(err))
 			// Arrêter le timer en cas d'erreur
 			WSStopPeriodicPing(connectionID)
 			return
 		}
+
+		// Enregistrer le timestamp du ping envoyé
+		pingTimesMutex.Lock()
+		clientPingTimestamps[connectionID] = time.Now()
+		pingTimesMutex.Unlock()
+
+		caddy.Log().Info("WS periodic ping sent", zap.String("connectionID", connectionID), zap.Duration("interval", interval), zap.String("pingData", string(pingData)))
 
 		// Programmer le prochain ping
 		pingTimesMutex.Lock()
@@ -2076,8 +2134,6 @@ func WSStartPeriodicPing(connectionID string, interval time.Duration) bool {
 			clientPingTimers[connectionID] = newTimer
 		}
 		pingTimesMutex.Unlock()
-
-		caddy.Log().Debug("WS periodic ping sent", zap.String("connectionID", connectionID), zap.Duration("interval", interval))
 	})
 
 	clientPingTimers[connectionID] = timer
@@ -2100,6 +2156,41 @@ func WSStopPeriodicPing(connectionID string) bool {
 
 	caddy.Log().Warn("WS periodic ping not running for client", zap.String("connectionID", connectionID))
 	return false
+}
+
+// WSSendManualPing envoie un ping unique pour tester la connexion
+func WSSendManualPing(connectionID string) bool {
+	// Vérifier que le client existe
+	connIDsMutex.RLock()
+	var target *gws.Conn
+	connIDs.Range(func(k, v any) bool {
+		if v.(string) == connectionID {
+			target = k.(*gws.Conn)
+			return false
+		}
+		return true
+	})
+	connIDsMutex.RUnlock()
+
+	if target == nil {
+		caddy.Log().Warn("WS sendManualPing: connection not found", zap.String("connectionID", connectionID))
+		return false
+	}
+
+	// Envoyer un ping unique
+	pingData := []byte(fmt.Sprintf("manual_ping_%d", time.Now().UnixNano()))
+	if err := target.WriteMessage(gws.OpcodePing, pingData); err != nil {
+		caddy.Log().Error("WS manual ping failed", zap.String("connectionID", connectionID), zap.Error(err))
+		return false
+	}
+
+	// Enregistrer le timestamp du ping envoyé
+	pingTimesMutex.Lock()
+	clientPingTimestamps[connectionID] = time.Now()
+	pingTimesMutex.Unlock()
+
+	caddy.Log().Info("WS manual ping sent", zap.String("connectionID", connectionID), zap.String("pingData", string(pingData)))
+	return true
 }
 
 // ===== GESTION DES CONNEXIONS =====

@@ -58,7 +58,7 @@ $chatSentCount = frankenphp_ws_sendAll("Message au chat", "/chat");
 $success = frankenphp_ws_killConnection("client_123");
 
 // Temps de ping
-frankenphp_ws_enablePing("client_123"); // Activer le ping/pong (sans ping périodique)
+frankenphp_ws_enablePing("client_123"); // Activer le ping/pong et envoyer un ping unique
 frankenphp_ws_enablePing("client_123", 5000); // Activer le ping/pong avec ping toutes les 5 secondes
 $pingTimeNs = frankenphp_ws_getClientPingTime("client_123");
 $pingTimeMs = $pingTimeNs / 1000000; // Convertir en millisecondes

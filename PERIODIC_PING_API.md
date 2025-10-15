@@ -23,7 +23,7 @@ Active le ping/pong pour une connexion WebSocket.
 - `bool` : `true` si le ping a été activé avec succès, `false` sinon
 
 **Comportement :**
-- Si `$intervalMs = 0` (défaut) : Active seulement le ping/pong manuel
+- Si `$intervalMs = 0` (défaut) : Active le ping/pong ET envoie un ping manuel unique pour tester la connexion
 - Si `$intervalMs > 0` : Active le ping/pong ET démarre le ping périodique automatique
 
 ### `frankenphp_ws_disablePing(string $connectionId): bool`
@@ -62,14 +62,19 @@ if ($success) {
 frankenphp_ws_disablePing("client_123");
 ```
 
-### Ping manuel uniquement
+### Ping manuel unique
 
 ```php
-// Activer seulement le ping/pong manuel (pas de ping périodique)
+// Activer le ping/pong et envoyer un ping unique pour tester la connexion
 $success = frankenphp_ws_enablePing("client_123");
 
 if ($success) {
-    echo "Ping manuel activé\n";
+    echo "Ping manuel activé et envoyé\n";
+    
+    // Attendre le pong
+    sleep(1);
+    $pingTime = frankenphp_ws_getClientPingTime("client_123");
+    echo "Temps de ping: " . ($pingTime / 1000000) . " ms\n";
 }
 
 // Désactiver
