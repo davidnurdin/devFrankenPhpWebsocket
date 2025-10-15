@@ -64,3 +64,37 @@ function frankenphp_ws_global_delete(string $key): bool {}
  */
 function frankenphp_ws_searchStoredInformation(string $key, string $op, string $value, ?string $route = null): array {}
 
+// ===== Constantes de l'extension (déclarées en C) =====
+// Note: Ces constantes sont définies dans le code C de l'extension et disponibles
+// automatiquement en PHP une fois l'extension compilée et chargée.
+
+/** @var string */
+const FRANKENPHP_WS_OP_EQ = 'eq';
+
+/** @var string */
+const FRANKENPHP_WS_OP_NEQ = 'neq';
+
+/** @var string */
+const FRANKENPHP_WS_OP_PREFIX = 'prefix';
+
+/** @var string */
+const FRANKENPHP_WS_OP_SUFFIX = 'suffix';
+
+/** @var string */
+const FRANKENPHP_WS_OP_CONTAINS = 'contains';
+
+/** @var string */
+const FRANKENPHP_WS_OP_IEQ = 'ieq';
+
+/** @var string */
+const FRANKENPHP_WS_OP_IPREFIX = 'iprefix';
+
+/** @var string */
+const FRANKENPHP_WS_OP_ISUFFIX = 'isuffix';
+
+/** @var string */
+const FRANKENPHP_WS_OP_ICONTAINS = 'icontains';
+
+/** @var string */
+const FRANKENPHP_WS_OP_REGEX = 'regex';
+
