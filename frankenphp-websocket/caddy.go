@@ -752,6 +752,129 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				return json.NewEncoder(w).Encode(response)
 			}),
 		},
+		// ===== ENDPOINTS POUR LA GESTION DE LA QUEUE COUNTER =====
+		{
+			Pattern: "/frankenphp_ws/enableQueueCounter/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodPost {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				clientID := r.PathValue("clientID")
+
+				// Récupérer les paramètres depuis les paramètres de requête
+				maxMessagesStr := r.URL.Query().Get("maxMessages")
+				maxTimeStr := r.URL.Query().Get("maxTime")
+
+				maxMessages := 100 // Valeur par défaut
+				maxTime := 3600    // 1 heure par défaut
+
+				if maxMessagesVal, err := strconv.Atoi(maxMessagesStr); err == nil && maxMessagesVal > 0 {
+					maxMessages = maxMessagesVal
+				}
+				if maxTimeVal, err := strconv.Atoi(maxTimeStr); err == nil && maxTimeVal > 0 {
+					maxTime = maxTimeVal
+				}
+
+				success := WSEnableQueueCounter(clientID, maxMessages, maxTime)
+				response := map[string]any{
+					"clientID":    clientID,
+					"success":     success,
+					"action":      "enableQueueCounter",
+					"maxMessages": maxMessages,
+					"maxTime":     maxTime,
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(response)
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/disableQueueCounter/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodPost {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				clientID := r.PathValue("clientID")
+
+				success := WSDisableQueueCounter(clientID)
+				response := map[string]any{
+					"clientID": clientID,
+					"success":  success,
+					"action":   "disableQueueCounter",
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(response)
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/getClientMessageCounter/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				clientID := r.PathValue("clientID")
+
+				counter := WSGetClientMessageCounter(clientID)
+				response := map[string]any{
+					"clientID": clientID,
+					"counter":  counter,
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(response)
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/getClientMessageQueue/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodGet {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				clientID := r.PathValue("clientID")
+
+				messages := WSGetClientMessageQueue(clientID)
+				messageData := make([]map[string]any, len(messages))
+				for i, msg := range messages {
+					messageData[i] = map[string]any{
+						"id":         msg.ID,
+						"data":       string(msg.Data),
+						"route":      msg.Route,
+						"timestamp":  msg.Timestamp.Unix(),
+						"sendType":   msg.SendType,
+						"sendTarget": msg.SendTarget,
+					}
+				}
+
+				response := map[string]any{
+					"clientID": clientID,
+					"messages": messageData,
+					"count":    len(messages),
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(response)
+			}),
+		},
+		{
+			Pattern: "/frankenphp_ws/clearClientMessageQueue/{clientID}",
+			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+				if r.Method != http.MethodPost {
+					return caddy.APIError{HTTPStatus: http.StatusMethodNotAllowed, Err: fmt.Errorf("method not allowed")}
+				}
+				clientID := r.PathValue("clientID")
+
+				success := WSClearClientMessageQueue(clientID)
+				response := map[string]any{
+					"clientID": clientID,
+					"success":  success,
+					"action":   "clearClientMessageQueue",
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				return json.NewEncoder(w).Encode(response)
+			}),
+		},
 		{
 			Pattern: "/frankenphp_ws/killConnection/{clientID}",
 			Handler: caddy.AdminHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
@@ -1345,6 +1468,101 @@ var clientPingIntervals = make(map[string]time.Duration) // connectionID -> ping
 var clientPingTimers = make(map[string]*time.Timer)      // connectionID -> timer for periodic ping
 var pingTimesMutex sync.RWMutex                          // Protège les accès concurrents à clientPingTimes
 
+// ===== SYSTÈME DE QUEUE COUNTER =====
+
+type QueueConfig struct {
+	Enabled     bool
+	MaxMessages int
+	MaxTime     time.Duration
+	CreatedAt   time.Time
+}
+
+type ClientMessage struct {
+	ID         uint64
+	Data       []byte
+	Route      string
+	Timestamp  time.Time
+	SendType   string // "direct", "tag", "tagExpression", "all"
+	SendTarget string // clientID, tag, expression, or "all"
+}
+
+var clientQueueConfigs = make(map[string]*QueueConfig) // clientID -> config
+var clientQueueConfigsMutex sync.RWMutex
+
+var clientMessageCounters = make(map[string]uint64) // clientID -> counter
+var clientCountersMutex sync.RWMutex
+
+var clientMessageQueues = make(map[string][]ClientMessage) // clientID -> messages
+var clientQueuesMutex sync.RWMutex
+
+// trackMessageSend enregistre un message envoyé pour un client (si la queue est activée)
+func trackMessageSend(clientID string, data []byte, route string, sendType string, sendTarget string) {
+	// Vérifier si la queue est activée pour ce client
+	clientQueueConfigsMutex.RLock()
+	config, exists := clientQueueConfigs[clientID]
+	enabled := exists && config.Enabled
+	clientQueueConfigsMutex.RUnlock()
+
+	if !enabled {
+		return // Queue non activée pour ce client
+	}
+
+	// Obtenir ID pour ce client
+	clientCountersMutex.Lock()
+	clientMessageCounters[clientID]++
+	msgID := clientMessageCounters[clientID]
+	clientCountersMutex.Unlock()
+
+	// Créer le message
+	message := ClientMessage{
+		ID:         msgID,
+		Data:       data,
+		Route:      route,
+		Timestamp:  time.Now(),
+		SendType:   sendType,
+		SendTarget: sendTarget,
+	}
+
+	// Ajouter à la queue avec nettoyage automatique
+	addToClientQueueWithCleanup(clientID, message, config)
+
+	caddy.Log().Info("Message tracked for client",
+		zap.String("clientID", clientID),
+		zap.Uint64("messageID", msgID),
+		zap.String("sendType", sendType),
+		zap.String("sendTarget", sendTarget))
+}
+
+// addToClientQueueWithCleanup ajoute un message à la queue avec nettoyage automatique
+func addToClientQueueWithCleanup(clientID string, message ClientMessage, config *QueueConfig) {
+	clientQueuesMutex.Lock()
+	defer clientQueuesMutex.Unlock()
+
+	if clientMessageQueues[clientID] == nil {
+		clientMessageQueues[clientID] = make([]ClientMessage, 0, config.MaxMessages)
+	}
+
+	// Ajouter le message
+	clientMessageQueues[clientID] = append(clientMessageQueues[clientID], message)
+
+	// Nettoyage automatique par nombre de messages
+	if config.MaxMessages > 0 && len(clientMessageQueues[clientID]) > config.MaxMessages {
+		clientMessageQueues[clientID] = clientMessageQueues[clientID][1:]
+	}
+
+	// Nettoyage automatique par temps
+	if config.MaxTime > 0 {
+		cutoff := time.Now().Add(-config.MaxTime)
+		filtered := make([]ClientMessage, 0, len(clientMessageQueues[clientID]))
+		for _, msg := range clientMessageQueues[clientID] {
+			if msg.Timestamp.After(cutoff) {
+				filtered = append(filtered, msg)
+			}
+		}
+		clientMessageQueues[clientID] = filtered
+	}
+}
+
 func newConnID() string {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
@@ -1845,6 +2063,8 @@ func WSSendToTag(tag string, data []byte, routeFilter string) int {
 				caddy.Log().Error("WS send to tag failed", zap.String("tag", tag), zap.String("connectionID", connectionID), zap.String("route", routeFilter), zap.Error(err))
 			} else {
 				sentCount++
+				// Tracker le message envoyé (si la queue est activée pour ce client)
+				trackMessageSend(connectionID, data, routeFilter, "tag", tag)
 			}
 		}
 	}
@@ -2193,6 +2413,102 @@ func WSSendManualPing(connectionID string) bool {
 	return true
 }
 
+// ===== GESTION DE LA QUEUE COUNTER =====
+
+// WSEnableQueueCounter active la queue counter pour un client spécifique
+func WSEnableQueueCounter(connectionID string, maxMessages int, maxTimeSeconds int) bool {
+	maxTime := time.Duration(maxTimeSeconds) * time.Second
+
+	clientQueueConfigsMutex.Lock()
+	defer clientQueueConfigsMutex.Unlock()
+
+	// Créer la configuration
+	config := &QueueConfig{
+		Enabled:     true,
+		MaxMessages: maxMessages,
+		MaxTime:     maxTime,
+		CreatedAt:   time.Now(),
+	}
+
+	clientQueueConfigs[connectionID] = config
+
+	// Initialiser le compteur si pas encore fait
+	clientCountersMutex.Lock()
+	if _, exists := clientMessageCounters[connectionID]; !exists {
+		clientMessageCounters[connectionID] = 0
+	}
+	clientCountersMutex.Unlock()
+
+	// Initialiser la queue
+	clientQueuesMutex.Lock()
+	if _, exists := clientMessageQueues[connectionID]; !exists {
+		clientMessageQueues[connectionID] = make([]ClientMessage, 0, maxMessages)
+	}
+	clientQueuesMutex.Unlock()
+
+	caddy.Log().Info("Queue counter enabled for client",
+		zap.String("clientID", connectionID),
+		zap.Int("maxMessages", maxMessages),
+		zap.Duration("maxTime", maxTime))
+
+	return true
+}
+
+// WSDisableQueueCounter désactive la queue counter pour un client spécifique
+func WSDisableQueueCounter(connectionID string) bool {
+	clientQueueConfigsMutex.Lock()
+	defer clientQueueConfigsMutex.Unlock()
+
+	if config, exists := clientQueueConfigs[connectionID]; exists {
+		config.Enabled = false
+		caddy.Log().Info("Queue counter disabled for client", zap.String("clientID", connectionID))
+		return true
+	}
+
+	return false
+}
+
+// WSGetClientMessageCounter retourne le compteur de messages pour un client
+func WSGetClientMessageCounter(connectionID string) uint64 {
+	clientCountersMutex.RLock()
+	defer clientCountersMutex.RUnlock()
+
+	if counter, exists := clientMessageCounters[connectionID]; exists {
+		return counter
+	}
+
+	return 0
+}
+
+// WSGetClientMessageQueue retourne la queue des messages pour un client
+func WSGetClientMessageQueue(connectionID string) []ClientMessage {
+	clientQueuesMutex.RLock()
+	defer clientQueuesMutex.RUnlock()
+
+	if messages, exists := clientMessageQueues[connectionID]; exists {
+		// Retourner une copie pour éviter les modifications concurrentes
+		result := make([]ClientMessage, len(messages))
+		copy(result, messages)
+		return result
+	}
+
+	return []ClientMessage{}
+}
+
+// WSClearClientMessageQueue vide la queue des messages pour un client
+func WSClearClientMessageQueue(connectionID string) bool {
+	clientQueuesMutex.Lock()
+	defer clientQueuesMutex.Unlock()
+
+	if _, exists := clientMessageQueues[connectionID]; exists {
+		clientMessageQueues[connectionID] = make([]ClientMessage, 0)
+		caddy.Log().Info("Message queue cleared for client", zap.String("clientID", connectionID))
+		return true
+	}
+
+	return false
+}
+
 // ===== GESTION DES CONNEXIONS =====
 
 // WSKillConnection ferme immédiatement une connexion WebSocket spécifique
@@ -2244,6 +2560,8 @@ func WSSendAll(data []byte, route string) int {
 		// Envoyer le message à cette connexion
 		if err := target.WriteMessage(gws.OpcodeBinary, data); err == nil {
 			sentCount++
+			// Tracker le message envoyé (si la queue est activée pour ce client)
+			trackMessageSend(connectionID, data, route, "all", "all")
 		} else {
 			caddy.Log().Error("WS sendAll failed", zap.String("connectionID", connectionID), zap.String("route", route), zap.Error(err))
 		}
@@ -2597,6 +2915,8 @@ func WSSendToTagExpression(expression string, data []byte, routeFilter string) i
 					caddy.Log().Error("WS send to tag expression failed", zap.String("expression", expression), zap.String("connectionID", connectionID), zap.String("route", routeFilter), zap.Error(err))
 				} else {
 					sentCount++
+					// Tracker le message envoyé (si la queue est activée pour ce client)
+					trackMessageSend(connectionID, data, routeFilter, "tagExpression", expression)
 				}
 			}
 		}

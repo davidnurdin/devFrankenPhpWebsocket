@@ -1,5 +1,5 @@
 /* This is a generated file, edit the .stub.php file instead.
- * Stub hash: 96fef238954162a65a77adc0d9ef7f065499e1b1 */
+ * Stub hash: 75296e7cee1f8fc46e3eb77cecfbeb61062b3cb7 */
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getClients, 0, 0, IS_ARRAY, 0)
 	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, route, IS_STRING, 1, "null")
@@ -34,6 +34,22 @@ ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_enablePing, 0, 1, 
 ZEND_END_ARG_INFO()
 
 #define arginfo_frankenphp_ws_disablePing arginfo_frankenphp_ws_killConnection
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_enableQueueCounter, 0, 1, _IS_BOOL, 0)
+	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, maxMessages, IS_LONG, 0, "100")
+	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, maxTimeSeconds, IS_LONG, 0, "3600")
+ZEND_END_ARG_INFO()
+
+#define arginfo_frankenphp_ws_disableQueueCounter arginfo_frankenphp_ws_killConnection
+
+#define arginfo_frankenphp_ws_getClientMessageCounter arginfo_frankenphp_ws_getClientPingTime
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_getClientMessageQueue, 0, 1, IS_ARRAY, 0)
+	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
+ZEND_END_ARG_INFO()
+
+#define arginfo_frankenphp_ws_clearClientMessageQueue arginfo_frankenphp_ws_killConnection
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_tagClient, 0, 2, IS_VOID, 0)
 	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
@@ -86,9 +102,7 @@ ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_hasStoredInformati
 	ZEND_ARG_TYPE_INFO(0, key, IS_STRING, 0)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_listStoredInformationKeys, 0, 1, IS_ARRAY, 0)
-	ZEND_ARG_TYPE_INFO(0, connectionId, IS_STRING, 0)
-ZEND_END_ARG_INFO()
+#define arginfo_frankenphp_ws_listStoredInformationKeys arginfo_frankenphp_ws_getClientMessageQueue
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_frankenphp_ws_sendToTagExpression, 0, 2, IS_VOID, 0)
 	ZEND_ARG_TYPE_INFO(0, expression, IS_STRING, 0)
@@ -138,6 +152,11 @@ ZEND_FUNCTION(frankenphp_ws_killConnection);
 ZEND_FUNCTION(frankenphp_ws_getClientPingTime);
 ZEND_FUNCTION(frankenphp_ws_enablePing);
 ZEND_FUNCTION(frankenphp_ws_disablePing);
+ZEND_FUNCTION(frankenphp_ws_enableQueueCounter);
+ZEND_FUNCTION(frankenphp_ws_disableQueueCounter);
+ZEND_FUNCTION(frankenphp_ws_getClientMessageCounter);
+ZEND_FUNCTION(frankenphp_ws_getClientMessageQueue);
+ZEND_FUNCTION(frankenphp_ws_clearClientMessageQueue);
 ZEND_FUNCTION(frankenphp_ws_tagClient);
 ZEND_FUNCTION(frankenphp_ws_untagClient);
 ZEND_FUNCTION(frankenphp_ws_clearTagClient);
@@ -170,6 +189,11 @@ static const zend_function_entry ext_functions[] = {
 	ZEND_FE(frankenphp_ws_getClientPingTime, arginfo_frankenphp_ws_getClientPingTime)
 	ZEND_FE(frankenphp_ws_enablePing, arginfo_frankenphp_ws_enablePing)
 	ZEND_FE(frankenphp_ws_disablePing, arginfo_frankenphp_ws_disablePing)
+	ZEND_FE(frankenphp_ws_enableQueueCounter, arginfo_frankenphp_ws_enableQueueCounter)
+	ZEND_FE(frankenphp_ws_disableQueueCounter, arginfo_frankenphp_ws_disableQueueCounter)
+	ZEND_FE(frankenphp_ws_getClientMessageCounter, arginfo_frankenphp_ws_getClientMessageCounter)
+	ZEND_FE(frankenphp_ws_getClientMessageQueue, arginfo_frankenphp_ws_getClientMessageQueue)
+	ZEND_FE(frankenphp_ws_clearClientMessageQueue, arginfo_frankenphp_ws_clearClientMessageQueue)
 	ZEND_FE(frankenphp_ws_tagClient, arginfo_frankenphp_ws_tagClient)
 	ZEND_FE(frankenphp_ws_untagClient, arginfo_frankenphp_ws_untagClient)
 	ZEND_FE(frankenphp_ws_clearTagClient, arginfo_frankenphp_ws_clearTagClient)

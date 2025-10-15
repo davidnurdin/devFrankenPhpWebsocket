@@ -18,6 +18,14 @@ function frankenphp_ws_enablePing(string $connectionId, int $intervalMs = 0): bo
 
 function frankenphp_ws_disablePing(string $connectionId): bool {}
 
+// ===== FONCTIONS POUR LA GESTION DE LA QUEUE COUNTER =====
+
+function frankenphp_ws_enableQueueCounter(string $connectionId, int $maxMessages = 100, int $maxTimeSeconds = 3600): bool {}
+function frankenphp_ws_disableQueueCounter(string $connectionId): bool {}
+function frankenphp_ws_getClientMessageCounter(string $connectionId): int {}
+function frankenphp_ws_getClientMessageQueue(string $connectionId): array {}
+function frankenphp_ws_clearClientMessageQueue(string $connectionId): bool {}
+
 function frankenphp_ws_tagClient(string $connectionId, string $tag): void {}
 
 function frankenphp_ws_untagClient(string $connectionId, string $tag): void {}

@@ -127,6 +127,74 @@ PHP_FUNCTION(frankenphp_ws_disablePing)
     RETURN_BOOL(frankenphp_ws_disablePing(connectionId) == 1);
 }
 
+// ===== FONCTIONS POUR LA GESTION DE LA QUEUE COUNTER =====
+
+PHP_FUNCTION(frankenphp_ws_enableQueueCounter)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+    zend_long maxMessages = 100;
+    zend_long maxTimeSeconds = 3600;
+
+    ZEND_PARSE_PARAMETERS_START(1, 3)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_LONG(maxMessages)
+        Z_PARAM_LONG(maxTimeSeconds)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_BOOL(frankenphp_ws_enableQueueCounter(connectionId, (int)maxMessages, (int)maxTimeSeconds) == 1);
+}
+
+PHP_FUNCTION(frankenphp_ws_disableQueueCounter)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_BOOL(frankenphp_ws_disableQueueCounter(connectionId) == 1);
+}
+
+PHP_FUNCTION(frankenphp_ws_getClientMessageCounter)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_LONG(frankenphp_ws_getClientMessageCounter(connectionId));
+}
+
+PHP_FUNCTION(frankenphp_ws_getClientMessageQueue)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    array_init(return_value);
+    frankenphp_ws_getClientMessageQueue(connectionId, return_value);
+}
+
+PHP_FUNCTION(frankenphp_ws_clearClientMessageQueue)
+{
+    char *connectionId = NULL;
+    size_t connectionId_len = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(connectionId, connectionId_len)
+    ZEND_PARSE_PARAMETERS_END();
+
+    RETURN_BOOL(frankenphp_ws_clearClientMessageQueue(connectionId) == 1);
+}
+
 PHP_FUNCTION(frankenphp_ws_tagClient)
 {
     char *connectionId = NULL;

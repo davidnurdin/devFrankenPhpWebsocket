@@ -223,6 +223,9 @@ func frankenphp_ws_send(connectionId *C.char, data *C.char, dataLen C.int, route
 		return
 	}
 
+	// Tracker le message envoyé (si la queue est activée pour ce client)
+	trackMessageSend(id, payload, routeStr, "direct", id)
+
 	caddy.Log().Info("WS message sent successfully", zap.String("id", id), zap.String("route", routeStr))
 }
 
@@ -910,6 +913,258 @@ func frankenphp_ws_getClientPingTime(connectionID *C.char) C.long {
 	// Mode Caddy/server : utilisation directe
 	pingTime := WSGetClientPingTime(connectionIDStr)
 	return C.long(pingTime.Nanoseconds())
+}
+
+// ===== FONCTIONS POUR LA GESTION DE LA QUEUE COUNTER =====
+
+//export frankenphp_ws_enableQueueCounter
+func frankenphp_ws_enableQueueCounter(connectionID *C.char, maxMessages C.int, maxTimeSeconds C.int) C.int {
+	connectionIDStr := C.GoString(connectionID)
+	maxMsgs := int(maxMessages)
+	maxTime := int(maxTimeSeconds)
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// POST /frankenphp_ws/enableQueueCounter/{clientID}?maxMessages=...&maxTime=...
+		urlStr := fmt.Sprintf("http://localhost:2019/frankenphp_ws/enableQueueCounter/%s", url.PathEscape(connectionIDStr))
+		if maxMsgs > 0 {
+			urlStr = fmt.Sprintf("%s?maxMessages=%d", urlStr, maxMsgs)
+		}
+		if maxTime > 0 {
+			separator := "?"
+			if maxMsgs > 0 {
+				separator = "&"
+			}
+			urlStr = fmt.Sprintf("%s%smaxTime=%d", urlStr, separator, maxTime)
+		}
+		req, err := http.NewRequest("POST", urlStr, nil)
+		if err != nil {
+			return 0
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return 0
+		}
+
+		var response struct {
+			ClientID string `json:"clientID"`
+			Success  bool   `json:"success"`
+			Action   string `json:"action"`
+		}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return 0
+		}
+
+		if response.Success {
+			return 1
+		}
+		return 0
+	}
+
+	// Mode Caddy/server : utilisation directe
+	success := WSEnableQueueCounter(connectionIDStr, maxMsgs, maxTime)
+	if success {
+		return 1
+	}
+	return 0
+}
+
+//export frankenphp_ws_disableQueueCounter
+func frankenphp_ws_disableQueueCounter(connectionID *C.char) C.int {
+	connectionIDStr := C.GoString(connectionID)
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// POST /frankenphp_ws/disableQueueCounter/{clientID}
+		urlStr := fmt.Sprintf("http://localhost:2019/frankenphp_ws/disableQueueCounter/%s", url.PathEscape(connectionIDStr))
+		req, err := http.NewRequest("POST", urlStr, nil)
+		if err != nil {
+			return 0
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return 0
+		}
+
+		var response struct {
+			ClientID string `json:"clientID"`
+			Success  bool   `json:"success"`
+			Action   string `json:"action"`
+		}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return 0
+		}
+
+		if response.Success {
+			return 1
+		}
+		return 0
+	}
+
+	// Mode Caddy/server : utilisation directe
+	success := WSDisableQueueCounter(connectionIDStr)
+	if success {
+		return 1
+	}
+	return 0
+}
+
+//export frankenphp_ws_getClientMessageCounter
+func frankenphp_ws_getClientMessageCounter(connectionID *C.char) C.long {
+	connectionIDStr := C.GoString(connectionID)
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// GET /frankenphp_ws/getClientMessageCounter/{clientID}
+		urlStr := fmt.Sprintf("http://localhost:2019/frankenphp_ws/getClientMessageCounter/%s", url.PathEscape(connectionIDStr))
+		req, err := http.NewRequest("GET", urlStr, nil)
+		if err != nil {
+			return 0
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return 0
+		}
+
+		var response struct {
+			ClientID string `json:"clientID"`
+			Counter  uint64 `json:"counter"`
+		}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return 0
+		}
+
+		return C.long(response.Counter)
+	}
+
+	// Mode Caddy/server : utilisation directe
+	counter := WSGetClientMessageCounter(connectionIDStr)
+	return C.long(counter)
+}
+
+//export frankenphp_ws_getClientMessageQueue
+func frankenphp_ws_getClientMessageQueue(connectionID *C.char, array unsafe.Pointer) {
+	connectionIDStr := C.GoString(connectionID)
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// GET /frankenphp_ws/getClientMessageQueue/{clientID}
+		urlStr := fmt.Sprintf("http://localhost:2019/frankenphp_ws/getClientMessageQueue/%s", url.PathEscape(connectionIDStr))
+		req, err := http.NewRequest("GET", urlStr, nil)
+		if err != nil {
+			return
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return
+		}
+
+		var response struct {
+			ClientID string `json:"clientID"`
+			Messages []struct {
+				ID         uint64 `json:"id"`
+				Data       string `json:"data"`
+				Route      string `json:"route"`
+				Timestamp  int64  `json:"timestamp"`
+				SendType   string `json:"sendType"`
+				SendTarget string `json:"sendTarget"`
+			} `json:"messages"`
+			Count int `json:"count"`
+		}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return
+		}
+
+		// Ajouter les messages à l'array PHP
+		for _, msg := range response.Messages {
+			messageData := fmt.Sprintf("ID:%d|Route:%s|Time:%d|SendType:%s|SendTarget:%s|Data:%s",
+				msg.ID, msg.Route, msg.Timestamp, msg.SendType, msg.SendTarget, msg.Data)
+			cstr := C.CString(messageData)
+			C.frankenphp_ws_addClient((*C.zval)(array), cstr)
+			C.free(unsafe.Pointer(cstr))
+		}
+		return
+	}
+
+	// Mode Caddy/server : utilisation directe
+	messages := WSGetClientMessageQueue(connectionIDStr)
+	for _, message := range messages {
+		messageData := fmt.Sprintf("ID:%d|Route:%s|Time:%d|SendType:%s|SendTarget:%s|Data:%s",
+			message.ID, message.Route, message.Timestamp.Unix(), message.SendType, message.SendTarget, string(message.Data))
+		cstr := C.CString(messageData)
+		C.frankenphp_ws_addClient((*C.zval)(array), cstr)
+		C.free(unsafe.Pointer(cstr))
+	}
+}
+
+//export frankenphp_ws_clearClientMessageQueue
+func frankenphp_ws_clearClientMessageQueue(connectionID *C.char) C.int {
+	connectionIDStr := C.GoString(connectionID)
+	sapi := getCurrentSAPI()
+
+	if sapi == "cli" {
+		// POST /frankenphp_ws/clearClientMessageQueue/{clientID}
+		urlStr := fmt.Sprintf("http://localhost:2019/frankenphp_ws/clearClientMessageQueue/%s", url.PathEscape(connectionIDStr))
+		req, err := http.NewRequest("POST", urlStr, nil)
+		if err != nil {
+			return 0
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return 0
+		}
+
+		var response struct {
+			ClientID string `json:"clientID"`
+			Success  bool   `json:"success"`
+			Action   string `json:"action"`
+		}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return 0
+		}
+
+		if response.Success {
+			return 1
+		}
+		return 0
+	}
+
+	// Mode Caddy/server : utilisation directe
+	success := WSClearClientMessageQueue(connectionIDStr)
+	if success {
+		return 1
+	}
+	return 0
 }
 
 //export frankenphp_ws_killConnection

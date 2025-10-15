@@ -12,6 +12,7 @@ Extension WebSocket pour FrankenPHP avec support des tags, stockage d'informatio
 - **[API Kill Connection](KILL_CONNECTION_API.md)** - Fermeture forcée de connexions
 - **[API Ping Time](PING_TIME_API.md)** - Mesure du temps de ping/pong
 - **[API Ping Périodique](PERIODIC_PING_API.md)** - Ping automatique à intervalles réguliers
+- **[API Queue Counter](QUEUE_COUNTER_API.md)** - Compteur et queue des messages par client
 
 ## Fonctions principales
 
@@ -24,6 +25,13 @@ Extension WebSocket pour FrankenPHP avec support des tags, stockage d'informatio
 - `frankenphp_ws_getClientPingTime(string $connectionId): int` - Temps de ping
 - `frankenphp_ws_enablePing(string $connectionId, int $intervalMs = 0): bool` - Activer ping/pong avec intervalle optionnel
 - `frankenphp_ws_disablePing(string $connectionId): bool` - Désactiver ping/pong
+
+### Gestion de la queue counter
+- `frankenphp_ws_enableQueueCounter(string $connectionId, int $maxMessages = 100, int $maxTimeSeconds = 3600): bool` - Activer le compteur et la queue des messages
+- `frankenphp_ws_disableQueueCounter(string $connectionId): bool` - Désactiver le compteur et la queue des messages
+- `frankenphp_ws_getClientMessageCounter(string $connectionId): int` - Obtenir le compteur de messages pour un client
+- `frankenphp_ws_getClientMessageQueue(string $connectionId): array` - Obtenir la queue des messages pour un client
+- `frankenphp_ws_clearClientMessageQueue(string $connectionId): bool` - Vider la queue des messages pour un client
 
 ### Système de tags
 - `frankenphp_ws_tagClient(string $connectionId, string $tag): void` - Ajouter un tag
@@ -63,6 +71,13 @@ frankenphp_ws_enablePing("client_123", 5000); // Activer le ping/pong avec ping 
 $pingTimeNs = frankenphp_ws_getClientPingTime("client_123");
 $pingTimeMs = $pingTimeNs / 1000000; // Convertir en millisecondes
 frankenphp_ws_disablePing("client_123"); // Désactiver le ping (arrête aussi le ping périodique)
+
+// Queue counter
+frankenphp_ws_enableQueueCounter("client_123", 50, 1800); // Activer la queue (50 messages max, 30 min max)
+$counter = frankenphp_ws_getClientMessageCounter("client_123"); // Obtenir le compteur
+$queue = frankenphp_ws_getClientMessageQueue("client_123"); // Obtenir la queue des messages
+frankenphp_ws_clearClientMessageQueue("client_123"); // Vider la queue
+frankenphp_ws_disableQueueCounter("client_123"); // Désactiver la queue
 
 // Gestion des tags
 frankenphp_ws_tagClient($connectionId, 'premium');
