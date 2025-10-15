@@ -48,7 +48,7 @@ function frankenphp_ws_global_delete(string $key): bool {}
 // ===== Stored Information search =====
 // Retourne la liste d'IDs correspondant à key/op/value, filtrable par route
 /**
- * Constantes PHP pour les opérateurs de recherche:
+ * Constantes PHP pour les opérateurs de recherche (déclarées en C dans MINIT):
  * - FRANKENPHP_WS_OP_EQ         => 'eq'
  * - FRANKENPHP_WS_OP_NEQ        => 'neq'
  * - FRANKENPHP_WS_OP_PREFIX     => 'prefix'
@@ -59,6 +59,8 @@ function frankenphp_ws_global_delete(string $key): bool {}
  * - FRANKENPHP_WS_OP_ISUFFIX    => 'isuffix'
  * - FRANKENPHP_WS_OP_ICONTAINS  => 'icontains'
  * - FRANKENPHP_WS_OP_REGEX      => 'regex'
+ * 
+ * Ces constantes sont enregistrées via REGISTER_STRING_CONSTANT dans la fonction MINIT
  */
 function frankenphp_ws_searchStoredInformation(string $key, string $op, string $value, ?string $route = null): array {}
 

@@ -194,7 +194,7 @@ if (!empty($gameStateJson)) {
 Recherche toutes les connexions dont la valeur associée à `$key` satisfait l'opérateur `$op` par rapport à `$value`. Retourne un tableau d'IDs de connexions. Optionnellement, limite la recherche aux connexions d'une `route` donnée.
 
 Opérateurs supportés:
-Vous pouvez utiliser directement les constantes PHP suivantes exposées par l’extension:
+Vous pouvez utiliser directement les constantes PHP suivantes exposées par l'extension. Ces constantes sont déclarées en C via `REGISTER_STRING_CONSTANT` dans la fonction MINIT :
 
 - `FRANKENPHP_WS_OP_EQ` : égal à (sensible à la casse)
 - `FRANKENPHP_WS_OP_NEQ` : différent de (sensible à la casse)
