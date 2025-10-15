@@ -4,6 +4,7 @@ package websocket
 import "C"
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -157,6 +158,9 @@ func frankenphp_ws_send(connectionId *C.char, data *C.char, dataLen C.int, route
 
 	id := C.GoString(connectionId)
 	payload := C.GoBytes(unsafe.Pointer(data), dataLen)
+	// Créer une copie des données pour éviter les problèmes de référence
+	payloadCopy := make([]byte, len(payload))
+	copy(payloadCopy, payload)
 	routeStr := ""
 	if route != nil {
 		routeStr = C.GoString(route)
@@ -224,7 +228,7 @@ func frankenphp_ws_send(connectionId *C.char, data *C.char, dataLen C.int, route
 	}
 
 	// Tracker le message envoyé (si la queue est activée pour ce client)
-	trackMessageSend(id, payload, routeStr, "direct", id)
+	trackMessageSend(id, payloadCopy, routeStr, "direct", id)
 
 	caddy.Log().Info("WS message sent successfully", zap.String("id", id), zap.String("route", routeStr))
 }
@@ -456,6 +460,9 @@ func frankenphp_ws_getClientsByTag(array unsafe.Pointer, tag *C.char) {
 func frankenphp_ws_sendToTag(tag *C.char, data *C.char, dataLen C.int, route *C.char) {
 	tagStr := C.GoString(tag)
 	payload := C.GoBytes(unsafe.Pointer(data), dataLen)
+	// Créer une copie des données pour éviter les problèmes de référence
+	payloadCopy := make([]byte, len(payload))
+	copy(payloadCopy, payload)
 	routeStr := ""
 	if route != nil {
 		routeStr = C.GoString(route)
@@ -488,7 +495,7 @@ func frankenphp_ws_sendToTag(tag *C.char, data *C.char, dataLen C.int, route *C.
 	}
 
 	// Mode Caddy/server : utilisation directe
-	sentCount := WSSendToTag(tagStr, payload, routeStr)
+	sentCount := WSSendToTag(tagStr, payloadCopy, routeStr)
 	caddy.Log().Info("WS message sent to tag successfully", zap.String("tag", tagStr), zap.String("route", routeStr), zap.Int("sentCount", sentCount))
 }
 
@@ -1101,6 +1108,7 @@ func frankenphp_ws_getClientMessageQueue(connectionID *C.char, array unsafe.Poin
 
 		// Ajouter les messages à l'array PHP
 		for _, msg := range response.Messages {
+			// Les données sont déjà encodées en base64 côté serveur
 			messageData := fmt.Sprintf("ID:%d|Route:%s|Time:%d|SendType:%s|SendTarget:%s|Data:%s",
 				msg.ID, msg.Route, msg.Timestamp, msg.SendType, msg.SendTarget, msg.Data)
 			cstr := C.CString(messageData)
@@ -1113,8 +1121,10 @@ func frankenphp_ws_getClientMessageQueue(connectionID *C.char, array unsafe.Poin
 	// Mode Caddy/server : utilisation directe
 	messages := WSGetClientMessageQueue(connectionIDStr)
 	for _, message := range messages {
+		// Encoder les données en base64 pour éviter les problèmes de concaténation
+		encodedData := base64.StdEncoding.EncodeToString(message.Data)
 		messageData := fmt.Sprintf("ID:%d|Route:%s|Time:%d|SendType:%s|SendTarget:%s|Data:%s",
-			message.ID, message.Route, message.Timestamp.Unix(), message.SendType, message.SendTarget, string(message.Data))
+			message.ID, message.Route, message.Timestamp.Unix(), message.SendType, message.SendTarget, encodedData)
 		cstr := C.CString(messageData)
 		C.frankenphp_ws_addClient((*C.zval)(array), cstr)
 		C.free(unsafe.Pointer(cstr))
@@ -1216,6 +1226,10 @@ func frankenphp_ws_killConnection(connectionID *C.char) C.int {
 //export frankenphp_ws_sendAll
 func frankenphp_ws_sendAll(data *C.char, dataLen C.int, route *C.char) C.int {
 	dataStr := C.GoStringN(data, dataLen)
+	// Créer une copie des données pour éviter les problèmes de référence
+	dataBytes := []byte(dataStr)
+	dataCopy := make([]byte, len(dataBytes))
+	copy(dataCopy, dataBytes)
 	routeStr := C.GoString(route)
 	sapi := getCurrentSAPI()
 
@@ -1253,7 +1267,7 @@ func frankenphp_ws_sendAll(data *C.char, dataLen C.int, route *C.char) C.int {
 	}
 
 	// Mode Caddy/server : utilisation directe
-	sentCount := WSSendAll([]byte(dataStr), routeStr)
+	sentCount := WSSendAll(dataCopy, routeStr)
 	return C.int(sentCount)
 }
 
@@ -1550,6 +1564,9 @@ func frankenphp_ws_global_delete(key *C.char) C.int {
 func frankenphp_ws_sendToTagExpression(expression *C.char, data *C.char, dataLen C.int, route *C.char) {
 	exprStr := C.GoString(expression)
 	payload := C.GoBytes(unsafe.Pointer(data), dataLen)
+	// Créer une copie des données pour éviter les problèmes de référence
+	payloadCopy := make([]byte, len(payload))
+	copy(payloadCopy, payload)
 	routeStr := ""
 	if route != nil {
 		routeStr = C.GoString(route)
@@ -1584,7 +1601,7 @@ func frankenphp_ws_sendToTagExpression(expression *C.char, data *C.char, dataLen
 	}
 
 	// Mode Caddy/server : utilisation directe
-	sentCount := WSSendToTagExpression(exprStr, payload, routeStr)
+	sentCount := WSSendToTagExpression(exprStr, payloadCopy, routeStr)
 	caddy.Log().Info("WS message sent to tag expression successfully", zap.String("expression", exprStr), zap.String("route", routeStr), zap.Int("sentCount", sentCount))
 }
 

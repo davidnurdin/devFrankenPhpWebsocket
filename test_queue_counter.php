@@ -32,6 +32,21 @@ echo "Nombre de messages en queue: " . count($queue) . "\n";
 
 foreach ($queue as $index => $messageData) {
     echo "Message " . ($index + 1) . ": " . $messageData . "\n";
+    
+    // Parser et décoder les données
+    $parts = explode('|', $messageData);
+    $dataPart = '';
+    foreach ($parts as $part) {
+        if (strpos($part, 'Data:') === 0) {
+            $dataPart = substr($part, 5); // Enlever "Data:"
+            break;
+        }
+    }
+    
+    if ($dataPart) {
+        $decodedData = base64_decode($dataPart);
+        echo "  -> Données décodées: " . $decodedData . "\n";
+    }
 }
 
 echo "\n6. Test avec sendAll (sera tracé pour ce client)\n";

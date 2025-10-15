@@ -5,6 +5,7 @@ import "C"
 import (
 	"bufio"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -836,9 +837,11 @@ func (MyAdmin) Routes() []caddy.AdminRoute {
 				messages := WSGetClientMessageQueue(clientID)
 				messageData := make([]map[string]any, len(messages))
 				for i, msg := range messages {
+					// Encoder les données en base64 pour éviter les problèmes de concaténation
+					encodedData := base64.StdEncoding.EncodeToString(msg.Data)
 					messageData[i] = map[string]any{
 						"id":         msg.ID,
-						"data":       string(msg.Data),
+						"data":       encodedData,
 						"route":      msg.Route,
 						"timestamp":  msg.Timestamp.Unix(),
 						"sendType":   msg.SendType,
@@ -1513,10 +1516,12 @@ func trackMessageSend(clientID string, data []byte, route string, sendType strin
 	msgID := clientMessageCounters[clientID]
 	clientCountersMutex.Unlock()
 
-	// Créer le message
+	// Créer le message avec une copie des données pour éviter les problèmes de référence
+	dataCopy := make([]byte, len(data))
+	copy(dataCopy, data)
 	message := ClientMessage{
 		ID:         msgID,
-		Data:       data,
+		Data:       dataCopy,
 		Route:      route,
 		Timestamp:  time.Now(),
 		SendType:   sendType,

@@ -151,8 +151,22 @@ echo "Messages envoyés à client_123 : " . $counter . "\n";
 $queue = frankenphp_ws_getClientMessageQueue("client_123");
 
 foreach ($queue as $messageData) {
-    // Format: "ID:123|Route:/chat|Time:1640995200|SendType:direct|SendTarget:client_123|Data:Hello"
+    // Format: "ID:123|Route:/chat|Time:1640995200|SendType:direct|SendTarget:client_123|Data:SGVsbG8gV29ybGQ="
     echo "Message en queue : " . $messageData . "\n";
+    
+    // Parser le message pour extraire les données
+    $parts = explode('|', $messageData);
+    $dataPart = '';
+    foreach ($parts as $part) {
+        if (strpos($part, 'Data:') === 0) {
+            $dataPart = substr($part, 5); // Enlever "Data:"
+            break;
+        }
+    }
+    
+    // Décoder les données base64
+    $decodedData = base64_decode($dataPart);
+    echo "Données décodées : " . $decodedData . "\n";
 }
 
 echo "Nombre de messages en queue : " . count($queue) . "\n";
@@ -241,7 +255,7 @@ ID:123|Route:/chat|Time:1640995200|SendType:direct|SendTarget:client_123|Data:He
 - `Time` : Timestamp Unix du message
 - `SendType` : Type d'envoi ("direct", "tag", "tagExpression", "all")
 - `SendTarget` : Cible de l'envoi (clientID, tag, expression, ou "all")
-- `Data` : Contenu du message
+- `Data` : Contenu du message (encodé en base64 pour éviter les problèmes de concaténation)
 
 ## API REST Admin
 
