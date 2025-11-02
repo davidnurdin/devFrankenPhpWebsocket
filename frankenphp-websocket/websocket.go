@@ -53,6 +53,7 @@ type Event struct {
 	Connection string
 	RemoteAddr string
 	Route      string
+	Headers    map[string][]string // Headers HTTP de la requête initiale
 	Payload    any
 	ResponseCh chan any
 }

@@ -1322,6 +1322,9 @@ func (h *MyHandler) OnOpen(socket *gws.Conn) {
 		route = "/unknown" // Route par défaut si non trouvée
 	}
 
+	// Récupérer les headers HTTP temporairement stockés
+	headers := GetAndRemoveTempHeaders(socket.RemoteAddr().String())
+
 	// route = "/default"
 
 	// Stocker la route pour cette connexion
@@ -1331,7 +1334,7 @@ func (h *MyHandler) OnOpen(socket *gws.Conn) {
 
 	println("Nouvelle connexion " + id + " sur la route " + route)
 	// Publie un événement d'ouverture (pas de réponse attendue)
-	w.events <- Event{Type: EventOpen, Connection: id, RemoteAddr: socket.RemoteAddr().String(), Route: route}
+	w.events <- Event{Type: EventOpen, Connection: id, RemoteAddr: socket.RemoteAddr().String(), Route: route, Headers: headers}
 }
 
 func (h *MyHandler) OnPing(socket *gws.Conn, payload []byte) {
@@ -1557,6 +1560,10 @@ var connRoutesMutex sync.RWMutex         // Protège les accès concurrents à c
 var tempRoutes = make(map[string]string) // remoteAddr -> route
 var tempRoutesMutex sync.RWMutex         // Protège les accès concurrents à tempRoutes
 
+// Stockage temporaire des headers HTTP en cours de connexion (par adresse IP)
+var tempHeaders = make(map[string]map[string][]string) // remoteAddr -> headers
+var tempHeadersMutex sync.RWMutex                      // Protège les accès concurrents à tempHeaders
+
 // Système de gestion des connexions fantômes
 var ghostConnections = make(map[string]bool) // connectionID -> isGhost
 var ghostConnectionsMutex sync.RWMutex       // Protège les accès concurrents à ghostConnections
@@ -1705,6 +1712,29 @@ func GetAndRemoveTempRoute(remoteAddr string) string {
 		delete(tempRoutes, remoteAddr)
 	}
 	return route
+}
+
+// StoreTempHeaders stocke temporairement les headers HTTP par adresse IP
+func StoreTempHeaders(remoteAddr string, headers http.Header) {
+	tempHeadersMutex.Lock()
+	defer tempHeadersMutex.Unlock()
+	// Convertir http.Header en map[string][]string
+	headersMap := make(map[string][]string)
+	for key, values := range headers {
+		headersMap[key] = values
+	}
+	tempHeaders[remoteAddr] = headersMap
+}
+
+// GetAndRemoveTempHeaders récupère et supprime les headers temporaires pour une adresse IP
+func GetAndRemoveTempHeaders(remoteAddr string) map[string][]string {
+	tempHeadersMutex.Lock()
+	defer tempHeadersMutex.Unlock()
+	headers, exists := tempHeaders[remoteAddr]
+	if exists {
+		delete(tempHeaders, remoteAddr)
+	}
+	return headers
 }
 
 // GetClientRoute récupère la route d'une connexion
@@ -1935,7 +1965,13 @@ func (g Websocket) Start() error {
 	g.srv = websocketServerFactory()
 
 	g.srv.OnRequest = func(conn net.Conn, br *bufio.Reader, r *http.Request) {
+		// == DEBUG == RemoteAddr et headers
+		caddy.Log().Info("== DEBUG == OnRequest",
+			zap.String("RemoteAddr", conn.RemoteAddr().String()),
+			zap.Any("Headers", r.Header))
+
 		StoreTempRoute(conn.RemoteAddr().String(), r.URL.Path)
+		StoreTempHeaders(conn.RemoteAddr().String(), r.Header)
 		socket, err := g.srv.GetUpgrader().UpgradeFromConn(conn, br, r)
 		if err != nil {
 			g.srv.OnError(conn, err)

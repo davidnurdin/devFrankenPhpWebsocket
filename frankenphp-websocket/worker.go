@@ -48,6 +48,20 @@ func (w *worker) ProvideRequest() *frankenphp.WorkerRequest[any, any] {
 	// log ev to Stderr
 	fmt.Println("ev", ev)
 
+	// Convertir les headers de map[string][]string en map[string]any pour PHP
+	var headersForPHP map[string]any
+	if ev.Headers != nil {
+		headersForPHP = make(map[string]any, len(ev.Headers))
+		for key, values := range ev.Headers {
+			// Convertir []string en []any
+			anyValues := make([]any, len(values))
+			for i, v := range values {
+				anyValues[i] = v
+			}
+			headersForPHP[key] = anyValues
+		}
+	}
+
 	return &frankenphp.WorkerRequest[any, any]{
 		Request: &http.Request{URL: u},
 		CallbackParameters: map[string]any{
@@ -55,6 +69,7 @@ func (w *worker) ProvideRequest() *frankenphp.WorkerRequest[any, any] {
 			"Connection": ev.Connection,
 			"RemoteAddr": ev.RemoteAddr,
 			"Route":      ev.Route,
+			"Headers":    headersForPHP,
 			"Payload":    ev.Payload,
 		},
 		AfterFunc: func(callbackReturn any) {
