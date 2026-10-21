@@ -190,3 +190,5 @@ Voir la documentation détaillée dans `GLOBAL_INFORMATION_API.md` pour l'utilis
 - `frankenphp_ws_global_delete(string $key): bool`
 
 Ces fonctions permettent de stocker des informations globales en mémoire, avec expiration optionnelle, en toute sécurité concurrente, et utilisables en CLI comme en mode serveur.
+
+<!-- cache check 2026-10-21 -->
